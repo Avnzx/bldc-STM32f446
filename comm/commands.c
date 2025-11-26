@@ -689,7 +689,6 @@ void commands_process_packet(unsigned char *data, unsigned int len,
 		int32_t ind = 0;
 		uint8_t send_buffer[50];
 		send_buffer[ind++] = COMM_GET_DECODED_PPM;
-		buffer_append_int32(send_buffer, (int32_t)(app_ppm_get_decoded_level() * 1000000.0), &ind);
 		buffer_append_int32(send_buffer, (int32_t)(servodec_get_last_pulse_len(0) * 1000000.0), &ind);
 		reply_func(send_buffer, ind);
 	} break;
@@ -698,10 +697,6 @@ void commands_process_packet(unsigned char *data, unsigned int len,
 		int32_t ind = 0;
 		uint8_t send_buffer[50];
 		send_buffer[ind++] = COMM_GET_DECODED_ADC;
-		buffer_append_int32(send_buffer, (int32_t)(app_adc_get_decoded_level() * 1000000.0), &ind);
-		buffer_append_int32(send_buffer, (int32_t)(app_adc_get_voltage() * 1000000.0), &ind);
-		buffer_append_int32(send_buffer, (int32_t)(app_adc_get_decoded_level2() * 1000000.0), &ind);
-		buffer_append_int32(send_buffer, (int32_t)(app_adc_get_voltage2() * 1000000.0), &ind);
 		reply_func(send_buffer, ind);
 	} break;
 
@@ -709,7 +704,6 @@ void commands_process_packet(unsigned char *data, unsigned int len,
 		int32_t ind = 0;
 		uint8_t send_buffer[50];
 		send_buffer[ind++] = COMM_GET_DECODED_CHUK;
-		buffer_append_int32(send_buffer, (int32_t)(app_nunchuk_get_decoded_y() * 1000000.0), &ind);
 		reply_func(send_buffer, ind);
 	} break;
 
@@ -729,27 +723,7 @@ void commands_process_packet(unsigned char *data, unsigned int len,
 #endif
 	} break;
 
-	case COMM_SET_CHUCK_DATA: {
-		chuck_data chuck_d_tmp;
-
-		int32_t ind = 0;
-		chuck_d_tmp.js_x = data[ind++];
-		chuck_d_tmp.js_y = data[ind++];
-		chuck_d_tmp.bt_c = data[ind++];
-		chuck_d_tmp.bt_z = data[ind++];
-		chuck_d_tmp.acc_x = buffer_get_int16(data, &ind);
-		chuck_d_tmp.acc_y = buffer_get_int16(data, &ind);
-		chuck_d_tmp.acc_z = buffer_get_int16(data, &ind);
-
-		if (len >= (unsigned int)ind + 2) {
-			chuck_d_tmp.rev_has_state = data[ind++];
-			chuck_d_tmp.is_rev = data[ind++];
-		} else {
-			chuck_d_tmp.rev_has_state = false;
-			chuck_d_tmp.is_rev = false;
-		}
-		app_nunchuk_update_output(&chuck_d_tmp);
-	} break;
+	case COMM_SET_CHUCK_DATA: {} break;
 
 	case COMM_CUSTOM_APP_DATA:
 		if (appdata_func) {

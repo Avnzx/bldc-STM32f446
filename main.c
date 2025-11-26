@@ -291,11 +291,8 @@ int main(void) {
 	comm_usb_init();
 #endif
 
-	app_uartcomm_initialize();
 	app_configuration *appconf = mempools_alloc_appconf();
 	conf_general_read_app_configuration(appconf);
-	app_uartcomm_start(UART_PORT_BUILTIN);
-	app_uartcomm_start(UART_PORT_EXTRA_HEADER);
 	app_set_configuration(appconf);
 
 	// This reads the appconf, that must be initialized first.
