@@ -46,7 +46,6 @@
 #include "mempools.h"
 #include "flash_helper.h"
 #include "crc.h"
-#include "nrf_driver.h"
 #include "buffer.h"
 #include "utils.h"
 #include "mcpwm_foc.h"
@@ -1009,10 +1008,6 @@ static void handle_file_read_response(CanardInstance* ins, CanardRxTransfer* tra
 
 	if (debug_level == 9) {
 		commands_printf("UAVCAN read_response\nlen: %d\noffset: %d",len, fw_update.ofs);
-	}
-
-	if (nrf_driver_ext_nrf_running()) {
-		nrf_driver_pause(2000);
 	}
 
 	// Write to flash, skip the first 6 bytes for Size and CRC so need to add 6 always

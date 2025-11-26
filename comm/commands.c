@@ -39,7 +39,6 @@
 #include "utils_sys.h"
 #include "packet.h"
 #include "encoder/encoder.h"
-#include "nrf_driver.h"
 #include "confgenerator.h"
 #include "imu.h"
 #include "shutdown.h"
@@ -306,10 +305,6 @@ void commands_process_packet(unsigned char *data, unsigned int len,
 		break;
 
 	case COMM_ERASE_NEW_APP_ALL_CAN:
-		if (nrf_driver_ext_nrf_running()) {
-			nrf_driver_pause(6000);
-		}
-
 		data[-1] = COMM_ERASE_NEW_APP;
 		comm_can_send_buffer(255, data - 1, len + 1, 2);
 		chThdSleepMilliseconds(1500);
@@ -318,9 +313,6 @@ void commands_process_packet(unsigned char *data, unsigned int len,
 	case COMM_ERASE_NEW_APP: {
 		int32_t ind = 0;
 
-		if (nrf_driver_ext_nrf_running()) {
-			nrf_driver_pause(6000);
-		}
 		uint16_t flash_res = flash_helper_erase_new_app(buffer_get_uint32(data, &ind));
 
 		ind = 0;
@@ -340,10 +332,6 @@ void commands_process_packet(unsigned char *data, unsigned int len,
 			lzo1x_decompress_safe(send_buffer_global, len - 6, data + 4, &decompressed_len, NULL);
 			mempools_free_packet_buffer(send_buffer_global);
 			len = decompressed_len + 4;
-		}
-
-		if (nrf_driver_ext_nrf_running()) {
-			nrf_driver_pause(2000);
 		}
 
 		data[-1] = COMM_WRITE_NEW_APP_DATA;
@@ -366,9 +354,6 @@ void commands_process_packet(unsigned char *data, unsigned int len,
 		int32_t ind = 0;
 		uint32_t new_app_offset = buffer_get_uint32(data, &ind);
 
-		if (nrf_driver_ext_nrf_running()) {
-			nrf_driver_pause(2000);
-		}
 		uint16_t flash_res = flash_helper_write_new_app_data(new_app_offset, data + ind, len - ind);
 
 		SHUTDOWN_RESET();
@@ -781,17 +766,6 @@ void commands_process_packet(unsigned char *data, unsigned int len,
 		}
 		break;
 
-	case COMM_NRF_START_PAIRING: {
-		int32_t ind = 0;
-		nrf_driver_start_pairing(buffer_get_int32(data, &ind));
-
-		ind = 0;
-		uint8_t send_buffer[50];
-		send_buffer[ind++] = packet_id;
-		send_buffer[ind++] = NRF_PAIR_STARTED;
-		reply_func(send_buffer, ind);
-	} break;
-
 	case COMM_GET_VALUES_SETUP:
 	case COMM_GET_VALUES_SETUP_SELECTIVE: {
 		setup_values val = mc_interface_get_setup_values();
@@ -1018,42 +992,6 @@ void commands_process_packet(unsigned char *data, unsigned int len,
 		reply_func(send_buffer, ind);
 	} break;
 
-	case COMM_EXT_NRF_PRESENT: {
-		if (!conf_general_permanent_nrf_found) {
-			if (len >= 1) {
-				nrf_flags = data[0];
-			}
-
-			nrf_driver_init_ext_nrf();
-			if (!nrf_driver_is_pairing()) {
-				const app_configuration *appconf = app_get_configuration();
-				uint8_t send_buffer[50];
-				send_buffer[0] = COMM_EXT_NRF_ESB_SET_CH_ADDR;
-				send_buffer[1] = appconf->app_nrf_conf.channel;
-				send_buffer[2] = appconf->app_nrf_conf.address[0];
-				send_buffer[3] = appconf->app_nrf_conf.address[1];
-				send_buffer[4] = appconf->app_nrf_conf.address[2];
-				commands_send_packet_nrf(send_buffer, 5);
-			}
-		}
-	} break;
-
-	case COMM_EXT_NRF_ESB_RX_DATA: {
-		if (len > 2) {
-			unsigned short crc = crc16((unsigned char*)data, len - 2);
-
-			if (crc	== ((unsigned short) data[len - 2] << 8 |
-					(unsigned short) data[len - 1])) {
-				nrf_driver_process_packet(data, len);
-			}
-		}
-	} break;
-
-	case COMM_SET_BLE_PIN:
-	case COMM_SET_BLE_NAME: {
-		commands_send_packet_nrf(data - 1, len + 1);
-	} break;
-
 	case COMM_APP_DISABLE_OUTPUT: {
 		int32_t ind = 0;
 		bool fwd_can = data[ind++];
@@ -1155,10 +1093,6 @@ void commands_process_packet(unsigned char *data, unsigned int len,
 	} break;
 
 	case COMM_ERASE_BOOTLOADER_ALL_CAN:
-		if (nrf_driver_ext_nrf_running()) {
-			nrf_driver_pause(6000);
-		}
-
 		data[-1] = COMM_ERASE_BOOTLOADER;
 		comm_can_send_buffer(255, data - 1, len + 1, 2);
 		chThdSleepMilliseconds(1500);
@@ -1167,9 +1101,6 @@ void commands_process_packet(unsigned char *data, unsigned int len,
 	case COMM_ERASE_BOOTLOADER: {
 		int32_t ind = 0;
 
-		if (nrf_driver_ext_nrf_running()) {
-			nrf_driver_pause(6000);
-		}
 		uint16_t flash_res = flash_helper_erase_bootloader();
 
 		ind = 0;
@@ -1401,10 +1332,6 @@ void commands_process_packet(unsigned char *data, unsigned int len,
 
 	case COMM_QMLUI_ERASE:
 	case COMM_LISP_ERASE_CODE: {
-		if (nrf_driver_ext_nrf_running()) {
-			nrf_driver_pause(6000);
-		}
-
 #ifdef USE_LISPBM
 		if (packet_id == COMM_LISP_ERASE_CODE) {
 			lispif_stop();
@@ -1426,9 +1353,6 @@ void commands_process_packet(unsigned char *data, unsigned int len,
 		int32_t ind = 0;
 		uint32_t qmlui_offset = buffer_get_uint32(data, &ind);
 
-		if (nrf_driver_ext_nrf_running()) {
-			nrf_driver_pause(2000);
-		}
 		uint16_t flash_res = flash_helper_write_code(packet_id == COMM_QMLUI_WRITE ? CODE_IND_QML : CODE_IND_LISP,
 				qmlui_offset, data + ind, len - ind);
 
@@ -2390,7 +2314,6 @@ static THD_FUNCTION(blocking_thread, arg) {
 
 		case COMM_BM_DISCONNECT: {
 			bm_disconnect();
-			bm_leave_nrf_debug_mode();
 
 			int32_t ind = 0;
 			send_buffer[ind++] = packet_id;

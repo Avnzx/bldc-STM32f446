@@ -43,9 +43,6 @@
 #include "encoder/encoder.h"
 #include "pwm_servo.h"
 #include "utils_math.h"
-#include "nrf_driver.h"
-#include "rfhelp.h"
-#include "spi_sw.h"
 #include "timer.h"
 #include "imu.h"
 #include "flash_helper.h"
@@ -304,23 +301,6 @@ int main(void) {
 	// This reads the appconf, that must be initialized first.
 #if CAN_ENABLE
 	comm_can_init();
-#endif
-
-#ifdef HW_HAS_PERMANENT_NRF
-	conf_general_permanent_nrf_found = nrf_driver_init();
-	if (conf_general_permanent_nrf_found) {
-		rfhelp_restart();
-	} else {
-		nrf_driver_stop();
-		// Set the nrf SPI pins to the general SPI interface so that
-		// an external NRF can be used with the NRF app.
-		spi_sw_change_pins(
-				HW_SPI_PORT_NSS, HW_SPI_PIN_NSS,
-				HW_SPI_PORT_SCK, HW_SPI_PIN_SCK,
-				HW_SPI_PORT_MOSI, HW_SPI_PIN_MOSI,
-				HW_SPI_PORT_MISO, HW_SPI_PIN_MISO);
-		HW_PERMANENT_NRF_FAILED_HOOK();
-	}
 #endif
 
 	// Threads
