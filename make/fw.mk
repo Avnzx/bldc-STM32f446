@@ -4,10 +4,11 @@
 #
 
 USE_LISPBM ?= 1
+USE_BLACKMAGIC ?= 1
 
 # Compiler options here.
 ifeq ($(USE_OPT),)
-  USE_OPT = -O2 -ggdb -fomit-frame-pointer -falign-functions=16 -std=gnu99 -D_GNU_SOURCE
+  USE_OPT = -Os -ffast-math -ggdb3 -fomit-frame-pointer -falign-functions=16 -std=gnu99 -D_GNU_SOURCE
   USE_OPT += -DBOARD_OTG_NOVBUSSENS $(build_args)
   USE_OPT += -DLBM_USE_DYN_FUNS -DLBM_USE_DYN_MACROS -DLBM_USE_DYN_LOOPS -DLBM_USE_TIME_QUOTA
   USE_OPT += -DLBM_USE_ERROR_LINENO -DLBM_USE_MACRO_REST_ARGS
@@ -37,7 +38,7 @@ endif
 
 # Enable this if you want link time optimizations (LTO)
 ifeq ($(USE_LTO),)
-  USE_LTO = no
+  USE_LTO = yes 
 endif
 
 # If enabled, this option allows to compile the application in THUMB mode.
@@ -110,12 +111,20 @@ include hwconf/hwconf.mk
 include applications/applications.mk
 include libcanard/canard.mk
 include imu/imu.mk
-include blackmagic/blackmagic.mk
 include encoder/encoder.mk
 
 ifeq ($(USE_LISPBM),1)
   include lispBM/lispbm.mk
   USE_OPT += -DUSE_LISPBM
+endif
+
+ifeq ($(USE_BLACKMAGIC),0)
+  USE_OPT += -DHAS_BLACKMAGIC=0
+endif
+
+ifeq ($(USE_BLACKMAGIC),1)
+  USE_OPT += -DHAS_BLACKMAGIC=1
+  include blackmagic/blackmagic.mk
 endif
 
 # Define linker script file here
