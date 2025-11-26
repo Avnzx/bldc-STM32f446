@@ -40,19 +40,12 @@
 #include "packet.h"
 #include "encoder/encoder.h"
 #include "confgenerator.h"
-#include "imu.h"
 #include "shutdown.h"
-#if HAS_BLACKMAGIC
-#include "bm_if.h"
-#endif
 #include "minilzo.h"
 #include "mempools.h"
 #include "bms.h"
 #include "qmlui.h"
 #include "crc.h"
-#ifdef USE_LISPBM
-#include "lispif.h"
-#endif
 #include "main.h"
 #include "conf_custom.h"
 #include "comm_usb.h"
@@ -606,13 +599,6 @@ void commands_process_packet(unsigned char *data, unsigned int len,
 		*appconf = *app_get_configuration();
 
 		if (confgenerator_deserialize_appconf(data, appconf)) {
-#ifdef HW_HAS_DUAL_MOTORS
-			// Ignore ID when setting second motor config
-			if (mc_interface_get_motor_thread() == 2) {
-				appconf->controller_id = app_get_configuration()->controller_id;
-			}
-#endif
-
 			if (packet_id == COMM_SET_APPCONF) {
 				conf_general_store_app_configuration(appconf);
 			}
@@ -645,12 +631,6 @@ void commands_process_packet(unsigned char *data, unsigned int len,
 		} else {
 			confgenerator_set_defaults_appconf(appconf);
 		}
-
-#ifdef HW_HAS_DUAL_MOTORS
-		if (mc_interface_get_motor_thread() == 2) {
-			appconf->controller_id = utils_second_motor_id();
-		}
-#endif
 
 		commands_send_appconf(packet_id, appconf, reply_func);
 
@@ -709,35 +689,12 @@ void commands_process_packet(unsigned char *data, unsigned int len,
 
 	case COMM_FORWARD_CAN: {
 		send_func_can_fwd = reply_func;
-
-#ifdef HW_HAS_DUAL_MOTORS
-		if (data[0] == utils_second_motor_id()) {
-			mc_interface_select_motor_thread(2);
-			commands_process_packet(data + 1, len - 1, reply_func);
-			mc_interface_select_motor_thread(1);
-		} else {
-			comm_can_send_buffer(data[0], data + 1, len - 1, 0);
-		}
-#else
 		comm_can_send_buffer(data[0], data + 1, len - 1, 0);
-#endif
 	} break;
 
-	case COMM_SET_CHUCK_DATA: {} break;
-
+	case COMM_SET_CHUCK_DATA:
 	case COMM_CUSTOM_APP_DATA:
-		if (appdata_func) {
-			appdata_func(data, len);
-		}
-#ifdef USE_LISPBM
-		lispif_process_custom_app_data(data, len);
-#endif
-		break;
-
 	case COMM_CUSTOM_HW_DATA:
-		if (hwdata_func) {
-			hwdata_func(data, len);
-		}
 		break;
 
 	case COMM_GET_VALUES_SETUP:
@@ -989,80 +946,6 @@ void commands_process_packet(unsigned char *data, unsigned int len,
 		int32_t ind = 0;
 		uint8_t send_buffer[70];
 		send_buffer[ind++] = packet_id;
-
-		int32_t ind2 = 0;
-		uint32_t mask = buffer_get_uint16(data, &ind2);
-
-		float rpy[3], acc[3], gyro[3], mag[3], q[4];
-		imu_get_rpy(rpy);
-		imu_get_accel(acc);
-		imu_get_gyro(gyro);
-		imu_get_mag(mag);
-		imu_get_quaternions(q);
-
-		buffer_append_uint16(send_buffer, mask, &ind);
-
-		if (mask & ((uint32_t)1 << 0)) {
-			buffer_append_float32_auto(send_buffer, rpy[0], &ind);
-		}
-		if (mask & ((uint32_t)1 << 1)) {
-			buffer_append_float32_auto(send_buffer, rpy[1], &ind);
-		}
-		if (mask & ((uint32_t)1 << 2)) {
-			buffer_append_float32_auto(send_buffer, rpy[2], &ind);
-		}
-
-		if (mask & ((uint32_t)1 << 3)) {
-			buffer_append_float32_auto(send_buffer, acc[0], &ind);
-		}
-		if (mask & ((uint32_t)1 << 4)) {
-			buffer_append_float32_auto(send_buffer, acc[1], &ind);
-		}
-		if (mask & ((uint32_t)1 << 5)) {
-			buffer_append_float32_auto(send_buffer, acc[2], &ind);
-		}
-
-		if (mask & ((uint32_t)1 << 6)) {
-			buffer_append_float32_auto(send_buffer, gyro[0], &ind);
-		}
-		if (mask & ((uint32_t)1 << 7)) {
-			buffer_append_float32_auto(send_buffer, gyro[1], &ind);
-		}
-		if (mask & ((uint32_t)1 << 8)) {
-			buffer_append_float32_auto(send_buffer, gyro[2], &ind);
-		}
-
-		if (mask & ((uint32_t)1 << 9)) {
-			buffer_append_float32_auto(send_buffer, mag[0], &ind);
-		}
-		if (mask & ((uint32_t)1 << 10)) {
-			buffer_append_float32_auto(send_buffer, mag[1], &ind);
-		}
-		if (mask & ((uint32_t)1 << 11)) {
-			buffer_append_float32_auto(send_buffer, mag[2], &ind);
-		}
-
-		if (mask & ((uint32_t)1 << 12)) {
-			buffer_append_float32_auto(send_buffer, q[0], &ind);
-		}
-		if (mask & ((uint32_t)1 << 13)) {
-			buffer_append_float32_auto(send_buffer, q[1], &ind);
-		}
-		if (mask & ((uint32_t)1 << 14)) {
-			buffer_append_float32_auto(send_buffer, q[2], &ind);
-		}
-		if (mask & ((uint32_t)1 << 15)) {
-			buffer_append_float32_auto(send_buffer, q[3], &ind);
-		}
-
-		uint8_t current_controller_id = app_get_configuration()->controller_id;
-#ifdef HW_HAS_DUAL_MOTORS
-		if (mc_interface_get_motor_thread() == 2) {
-			current_controller_id = utils_second_motor_id();
-		}
-#endif
-		send_buffer[ind++] = current_controller_id;
-
 		reply_func(send_buffer, ind);
 	} break;
 
@@ -1306,13 +1189,6 @@ void commands_process_packet(unsigned char *data, unsigned int len,
 
 	case COMM_QMLUI_ERASE:
 	case COMM_LISP_ERASE_CODE: {
-#ifdef USE_LISPBM
-		if (packet_id == COMM_LISP_ERASE_CODE) {
-			lispif_stop();
-			flash_helper_erase_code(CODE_IND_LISP_CONST);
-		}
-#endif
-
 		uint16_t flash_res = flash_helper_erase_code(packet_id == COMM_QMLUI_ERASE ? CODE_IND_QML : CODE_IND_LISP);
 
 		int32_t ind = 0;
@@ -1471,12 +1347,8 @@ void commands_process_packet(unsigned char *data, unsigned int len,
 	case COMM_LISP_GET_STATS:
 	case COMM_LISP_REPL_CMD:
 	case COMM_LISP_STREAM_CODE:
-	case COMM_LISP_RMSG: {
-#ifdef USE_LISPBM
-		lispif_process_cmd(data - 1, len + 1, reply_func);
-#endif
-		break;
-	}
+	case COMM_LISP_RMSG:
+	    break;	
 
 	case COMM_GET_CUSTOM_CONFIG:
 	case COMM_GET_CUSTOM_CONFIG_DEFAULT:
@@ -1927,11 +1799,6 @@ static THD_FUNCTION(blocking_thread, arg) {
 		chThdSleepMilliseconds(10);
 	}
 
-	// Start lisp from here because main does not have enough stack space.
-#ifdef USE_LISPBM
-	lispif_init();
-#endif
-
 	for(;;) {
 		is_blocking = false;
 
@@ -2225,154 +2092,9 @@ static THD_FUNCTION(blocking_thread, arg) {
 			}
 		} break;
 
-#if HAS_BLACKMAGIC
-		case COMM_BM_CONNECT: {
-			int32_t ind = 0;
-			send_buffer[ind++] = packet_id;
-			buffer_append_int16(send_buffer, bm_connect(), &ind);
-			if (send_func_blocking) {
-				send_func_blocking(send_buffer, ind);
-			}
-		} break;
-
-		case COMM_BM_ERASE_FLASH_ALL: {
-			int32_t ind = 0;
-			send_buffer[ind++] = packet_id;
-			buffer_append_int16(send_buffer, bm_erase_flash_all(), &ind);
-			if (send_func_blocking) {
-				send_func_blocking(send_buffer, ind);
-			}
-		} break;
-
-		case COMM_BM_WRITE_FLASH_LZO:
-		case COMM_BM_WRITE_FLASH: {
-			if (packet_id == COMM_BM_WRITE_FLASH_LZO) {
-				memcpy(send_buffer, data + 6, len - 6);
-				int32_t ind = 4;
-				lzo_uint decompressed_len = buffer_get_uint16(data, &ind);
-				lzo1x_decompress_safe(send_buffer, len - 6, data + 4, &decompressed_len, NULL);
-				len = decompressed_len + 4;
-			}
-
-			int32_t ind = 0;
-			uint32_t addr = buffer_get_uint32(data, &ind);
-
-			int res = bm_write_flash(addr, data + ind, len - ind);
-
-			ind = 0;
-			send_buffer[ind++] = packet_id;
-			buffer_append_int16(send_buffer, res, &ind);
-			if (send_func_blocking) {
-				send_func_blocking(send_buffer, ind);
-			}
-		} break;
-
-		case COMM_BM_REBOOT: {
-			int32_t ind = 0;
-			send_buffer[ind++] = packet_id;
-			buffer_append_int16(send_buffer, bm_reboot(), &ind);
-			if (send_func_blocking) {
-				send_func_blocking(send_buffer, ind);
-			}
-		} break;
-
-		case COMM_BM_HALT_REQ: {
-			bm_halt_req();
-
-			int32_t ind = 0;
-			send_buffer[ind++] = packet_id;
-			if (send_func_blocking) {
-				send_func_blocking(send_buffer, ind);
-			}
-		} break;
-
-		case COMM_BM_DISCONNECT: {
-			bm_disconnect();
-
-			int32_t ind = 0;
-			send_buffer[ind++] = packet_id;
-			if (send_func_blocking) {
-				send_func_blocking(send_buffer, ind);
-			}
-		} break;
-
-		case COMM_BM_MAP_PINS_DEFAULT: {
-			bm_default_swd_pins();
-			int32_t ind = 0;
-			send_buffer[ind++] = packet_id;
-			buffer_append_int16(send_buffer, 1, &ind);
-			if (send_func_blocking) {
-				send_func_blocking(send_buffer, ind);
-			}
-		} break;
-
-		case COMM_BM_MAP_PINS_NRF5X: {
-			int32_t ind = 0;
-			send_buffer[ind++] = packet_id;
-
-#ifdef NRF5x_SWDIO_GPIO
-			buffer_append_int16(send_buffer, 1, &ind);
-			bm_change_swd_pins(NRF5x_SWDIO_GPIO, NRF5x_SWDIO_PIN,
-					NRF5x_SWCLK_GPIO, NRF5x_SWCLK_PIN);
-#else
-			buffer_append_int16(send_buffer, 0, &ind);
-#endif
-			if (send_func_blocking) {
-				send_func_blocking(send_buffer, ind);
-			}
-		} break;
-
-		case COMM_BM_MEM_READ: {
-			int32_t ind = 0;
-			uint32_t addr = buffer_get_uint32(data, &ind);
-			uint16_t read_len = buffer_get_uint16(data, &ind);
-
-			if (read_len > sizeof(send_buffer) - 3) {
-				read_len = sizeof(send_buffer) - 3;
-			}
-
-			int res = bm_mem_read(addr, send_buffer + 3, read_len);
-
-			ind = 0;
-			send_buffer[ind++] = packet_id;
-			buffer_append_int16(send_buffer, res, &ind);
-			if (send_func_blocking) {
-				send_func_blocking(send_buffer, ind + read_len);
-			}
-		} break;
-
-		case COMM_BM_MEM_WRITE: {
-			int32_t ind = 0;
-			uint32_t addr = buffer_get_uint32(data, &ind);
-
-			int res = bm_mem_write(addr, data + ind, len - ind);
-
-			ind = 0;
-			send_buffer[ind++] = packet_id;
-			buffer_append_int16(send_buffer, res, &ind);
-			if (send_func_blocking) {
-				send_func_blocking(send_buffer, ind);
-			}
-		} break;
-#endif
 		case COMM_GET_IMU_CALIBRATION: {
 			int32_t ind = 0;
-			float yaw = buffer_get_float32(data, 1e3, &ind);
-			float imu_cal[9];
-			imu_get_calibration(yaw, imu_cal);
-
-			ind = 0;
 			send_buffer[ind++] = COMM_GET_IMU_CALIBRATION;
-			buffer_append_float32(send_buffer, imu_cal[0], 1e6, &ind);
-			buffer_append_float32(send_buffer, imu_cal[1], 1e6, &ind);
-			buffer_append_float32(send_buffer, imu_cal[2], 1e6, &ind);
-			buffer_append_float32(send_buffer, imu_cal[3], 1e6, &ind);
-			buffer_append_float32(send_buffer, imu_cal[4], 1e6, &ind);
-			buffer_append_float32(send_buffer, imu_cal[5], 1e6, &ind);
-			buffer_append_float32(send_buffer, imu_cal[6], 1e6, &ind);
-			buffer_append_float32(send_buffer, imu_cal[7], 1e6, &ind);
-			buffer_append_float32(send_buffer, imu_cal[8], 1e6, &ind);
-
 			if (send_func_blocking) {
 				send_func_blocking(send_buffer, ind);
 			}

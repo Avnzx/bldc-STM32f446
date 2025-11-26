@@ -31,10 +31,6 @@
 #include "buffer.h"
 #include <string.h>
 
-#ifdef USE_LISPBM
-#include "lispif.h"
-#endif
-
 /*
  * Defines
  */
@@ -130,10 +126,6 @@ static const uint16_t flash_sector[FLASH_SECTORS] = {
 };
 
 uint16_t flash_helper_erase_new_app(uint32_t new_app_size) {
-#ifdef USE_LISPBM
-	lispif_stop();
-#endif
-
 	FLASH_Unlock();
 	FLASH_ClearFlag(FLASH_FLAG_OPERR | FLASH_FLAG_WRPERR | FLASH_FLAG_PGAERR |
 			FLASH_FLAG_PGPERR | FLASH_FLAG_PGSERR);
@@ -182,12 +174,6 @@ uint16_t flash_helper_write_new_app_data(uint32_t offset, uint8_t *data, uint32_
 }
 
 uint16_t flash_helper_erase_code(int ind) {
-#ifdef USE_LISPBM
-	if (ind == CODE_IND_LISP || ind == CODE_IND_LISP_CONST) {
-		lispif_stop();
-	}
-#endif
-
 	uint8_t *ptr = flash_helper_code_data_raw(ind);
 
 	bool has_data = false;

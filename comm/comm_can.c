@@ -43,9 +43,6 @@
 #include "encoder_cfg.h"
 #include "servo_dec.h"
 #include "utils.h"
-#ifdef USE_LISPBM
-#include "lispif.h"
-#endif
 
 // Settings
 #define RX_FRAMES_SIZE	50
@@ -1362,25 +1359,11 @@ static THD_FUNCTION(cancom_process_thread, arg) {
 					if (sid_callback) {
 						sid_cb_used = sid_callback(rxmsg.SID, rxmsg.data8, rxmsg.DLC);
 					}
-#ifdef USE_LISPBM
-					if (!sid_cb_used) {
-						lispif_process_can(rxmsg.SID, rxmsg.data8, rxmsg.DLC, false);
-					}
-#else
-					(void)sid_cb_used;
-#endif
 				} else {
 					bool eid_cb_used = false;
 					if (eid_callback) {
 						eid_cb_used = eid_callback(rxmsg.EID, rxmsg.data8, rxmsg.DLC);
 					}
-#ifdef USE_LISPBM
-					if (!eid_cb_used) {
-						lispif_process_can(rxmsg.EID, rxmsg.data8, rxmsg.DLC, true);
-					}
-#else
-					(void)eid_cb_used;
-#endif
 				}
 			}
 			continue;
@@ -1399,9 +1382,6 @@ static THD_FUNCTION(cancom_process_thread, arg) {
 				if (!eid_cb_used) {
 					if (!bms_process_can_frame(rxmsg.EID, rxmsg.data8, rxmsg.DLC, true)) {
 						decode_msg(rxmsg.EID, rxmsg.data8, rxmsg.DLC, false);
-#ifdef USE_LISPBM
-						lispif_process_can(rxmsg.EID, rxmsg.data8, rxmsg.DLC, true);
-#endif
 					}
 				}
 			} else {
@@ -1413,12 +1393,6 @@ static THD_FUNCTION(cancom_process_thread, arg) {
 				if (!sid_cb_used) {
 					sid_cb_used = bms_process_can_frame(rxmsg.SID, rxmsg.data8, rxmsg.DLC, false);
 				}
-
-#ifdef USE_LISPBM
-				if (!sid_cb_used) {
-					lispif_process_can(rxmsg.SID, rxmsg.data8, rxmsg.DLC, false);
-				}
-#endif
 			}
 		}
 	}

@@ -3,9 +3,6 @@
 # NOTE: Can be overridden externally.
 #
 
-USE_LISPBM ?= 1
-USE_BLACKMAGIC ?= 1
-
 # Compiler options here.
 ifeq ($(USE_OPT),)
   USE_OPT = -Os -ffast-math -ggdb3 -fomit-frame-pointer -falign-functions=16 -std=gnu99 -D_GNU_SOURCE
@@ -110,22 +107,7 @@ include $(CHIBIOS)/os/rt/ports/ARMCMx/compilers/GCC/mk/port_v7m.mk
 include hwconf/hwconf.mk
 include applications/applications.mk
 include libcanard/canard.mk
-include imu/imu.mk
 include encoder/encoder.mk
-
-ifeq ($(USE_LISPBM),1)
-  include lispBM/lispbm.mk
-  USE_OPT += -DUSE_LISPBM
-endif
-
-ifeq ($(USE_BLACKMAGIC),0)
-  USE_OPT += -DHAS_BLACKMAGIC=0
-endif
-
-ifeq ($(USE_BLACKMAGIC),1)
-  USE_OPT += -DHAS_BLACKMAGIC=1
-  include blackmagic/blackmagic.mk
-endif
 
 # Define linker script file here
 LDSCRIPT= ld_eeprom_emu.ld
@@ -152,15 +134,9 @@ CSRC = $(STARTUPSRC) \
        $(HWSRC) \
        $(APPSRC) \
        $(CANARDSRC) \
-       $(IMUSRC) \
-       $(BLACKMAGICSRC) \
        qmlui/qmlui.c \
        $(ENCSRC) \
        conf_custom.c
-
-ifeq ($(USE_LISPBM),1)
-  CSRC += $(LISPBMSRC)
-endif
 
 # C++ sources that can be compiled in ARM or THUMB mode depending on the global
 # setting.
@@ -196,8 +172,6 @@ INCDIR = $(STARTUPINC) $(KERNINC) $(PORTINC) $(OSALINC) \
          $(HWINC) \
          $(APPINC) \
          $(CANARDINC) \
-         $(IMUINC) \
-         $(BLACKMAGICINC) \
          qmlui \
          qmlui/hw \
          qmlui/app \
@@ -207,10 +181,6 @@ include comm/comm.mk
 include motor/motor.mk
 include util/util.mk
 include driver/driver.mk
-
-ifeq ($(USE_LISPBM),1)
-  INCDIR += $(LISPBMINC)
-endif
 
 ifdef app_custom_mkfile
 include $(app_custom_mkfile)

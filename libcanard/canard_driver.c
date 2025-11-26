@@ -49,7 +49,6 @@
 #include "buffer.h"
 #include "utils.h"
 #include "mcpwm_foc.h"
-#include "imu.h"
 
 // Constants
 #define CAN_APP_NODE_NAME								"org.vesc." HW_NAME
@@ -534,21 +533,6 @@ static void sendRtData(CanardInstance *ins) {
 	data.curr_in = mc_interface_get_tot_current_in_filtered();
 	data.curr_d = mcpwm_foc_get_id();
 	data.curr_q = mcpwm_foc_get_iq();
-
-	float rpy[3], acc[3], gyro[3];
-	imu_get_rpy(rpy);
-	imu_get_accel(acc);
-	imu_get_gyro(gyro);
-
-	data.roll = rpy[0];
-	data.pitch = rpy[1];
-	data.yaw = rpy[2];
-	data.acc_x = acc[0];
-	data.acc_y = acc[1];
-	data.acc_z = acc[2];
-	data.gyro_x = gyro[0];
-	data.gyro_y = gyro[1];
-	data.gyro_z = gyro[2];
 
 	data.erpm = mc_interface_get_rpm();
 	data.rpm = mc_interface_get_rpm() / ((float)conf->si_motor_poles / 2.0);

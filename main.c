@@ -44,15 +44,11 @@
 #include "pwm_servo.h"
 #include "utils_math.h"
 #include "timer.h"
-#include "imu.h"
 #include "flash_helper.h"
 #include "conf_custom.h"
 #include "crc.h"
 #include "qmlui.h"
 
-#if HAS_BLACKMAGIC
-#include "bm_if.h"
-#endif
 #include "shutdown.h"
 #include "mempools.h"
 #include "events.h"
@@ -61,10 +57,6 @@
 #ifdef CAN_ENABLE
 #include "comm_can.h"
 #define CAN_FRAME_MAX_PL_SIZE	8
-#endif
-
-#ifdef USE_LISPBM
-#include "lispif.h"
 #endif
 
 /*
@@ -308,13 +300,7 @@ int main(void) {
 	timeout_init();
 	timeout_configure(appconf->timeout_msec, appconf->timeout_brake_current, appconf->kill_sw_mode);
 
-#if HAS_BLACKMAGIC
-	bm_init();
-#endif
-
 	shutdown_init();
-
-	imu_reset_orientation();
 
 	chThdSleepMilliseconds(500);
 	m_init_done = true;
@@ -358,26 +344,5 @@ void main_stop_motor_and_reset(void) {
 #ifdef HW_HAS_DRV8313
 		DISABLE_BR();
 #endif
-
-#ifdef HW_HAS_DUAL_MOTORS
-	TIM_SelectOCxM(TIM8, TIM_Channel_1, TIM_ForcedAction_InActive);
-	TIM_CCxCmd(TIM8, TIM_Channel_1, TIM_CCx_Enable);
-	TIM_CCxNCmd(TIM8, TIM_Channel_1, TIM_CCxN_Disable);
-
-	TIM_SelectOCxM(TIM8, TIM_Channel_2, TIM_ForcedAction_InActive);
-	TIM_CCxCmd(TIM8, TIM_Channel_2, TIM_CCx_Enable);
-	TIM_CCxNCmd(TIM8, TIM_Channel_2, TIM_CCxN_Disable);
-
-	TIM_SelectOCxM(TIM8, TIM_Channel_3, TIM_ForcedAction_InActive);
-	TIM_CCxCmd(TIM8, TIM_Channel_3, TIM_CCx_Enable);
-	TIM_CCxNCmd(TIM8, TIM_Channel_3, TIM_CCxN_Disable);
-
-	TIM_GenerateEvent(TIM8, TIM_EventSource_COM);
-
-#ifdef HW_HAS_DRV8313_2
-		ENABLE_BR_2();
-#endif
-#endif
-
 	NVIC_SystemReset();
 }
