@@ -69,7 +69,7 @@
 	#define STM32_PLS							STM32_PLS_LEV6
 	#define STM32_BKPRAM_ENABLE					FALSE
 #else
-	// 8M  XTAL / 25MHz External
+	// 24M  XTAL / 25MHz External
 	#define STM32_NO_INIT						FALSE
 	#define STM32_HSI_ENABLED					TRUE
 	#define STM32_LSI_ENABLED					TRUE
@@ -85,9 +85,9 @@
 			#define STM32_HSECLK				25000000U
 		#endif
 	#else
-		#define STM32_PLLM_VALUE				8
+		#define STM32_PLLM_VALUE				24
 		#if !defined(STM32_HSECLK)
-			#define STM32_HSECLK				8000000U
+			#define STM32_HSECLK				24000000U
 		#endif
 	#endif
 	#define STM32_PLLN_VALUE					336
