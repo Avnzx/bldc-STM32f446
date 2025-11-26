@@ -48,16 +48,6 @@
 #define CURRENT_FILTER_ON()		palSetPad(GPIOD, 2)
 #define CURRENT_FILTER_OFF()	palClearPad(GPIOD, 2)
 
-// Switch on current filter if a permanent
-// NRF24 cannot be found, as the later
-// HW60 has changed one of the permanent NRF
-// pins to the current filter activation pin.
-#define HW_PERMANENT_NRF_FAILED_HOOK() \
-			palSetPadMode(GPIOD, 2, \
-			PAL_MODE_OUTPUT_PUSHPULL | \
-			PAL_STM32_OSPEED_HIGHEST); \
-			CURRENT_FILTER_ON()
-
 /*
  * ADC Vector
  *
@@ -186,12 +176,12 @@
 #define HW_ICU_PIN				6
 
 // I2C Peripheral
-#define HW_I2C_DEV				I2CD2
-#define HW_I2C_GPIO_AF			GPIO_AF_I2C2
-#define HW_I2C_SCL_PORT			GPIOB
-#define HW_I2C_SCL_PIN			10
-#define HW_I2C_SDA_PORT			GPIOB
-#define HW_I2C_SDA_PIN			11
+#define HW_I2C_DEV              I2CD2
+#define HW_I2C_GPIO_AF          GPIO_AF_I2C2
+#define HW_I2C_SCL_PORT         GPIOB
+#define HW_I2C_SCL_PIN          10
+#define HW_I2C_SDA_PORT         GPIOB
+#define HW_I2C_SDA_PIN          11
 
 // Hall/encoder pins
 #define HW_HALL_ENC_GPIO1		GPIOC
@@ -210,16 +200,6 @@
 #define HW_ENC_EXTI_ISR_VEC		EXTI9_5_IRQHandler
 #define HW_ENC_TIM_ISR_CH		TIM3_IRQn
 #define HW_ENC_TIM_ISR_VEC		TIM3_IRQHandler
-
-// NRF pins
-#define NRF_PORT_CSN			GPIOB
-#define NRF_PIN_CSN				12
-#define NRF_PORT_SCK			GPIOB
-#define NRF_PIN_SCK				4
-#define NRF_PORT_MOSI			GPIOB
-#define NRF_PIN_MOSI			3
-#define NRF_PORT_MISO			GPIOD
-#define NRF_PIN_MISO			2
 
 // SPI pins
 #define HW_SPI_DEV				SPID1
