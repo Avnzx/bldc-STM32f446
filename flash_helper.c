@@ -34,12 +34,12 @@
 /*
  * Defines
  */
-#define FLASH_SECTORS							12
+#define FLASH_SECTORS							8
 #define BOOTLOADER_BASE							11
 #define APP_BASE								0
 #define NEW_APP_BASE							8
 #define NEW_APP_SECTORS							3
-#define APP_MAX_SIZE							(1024 * 128 * 4 - 8) // Note that the bootloader needs 8 extra bytes
+#define APP_MAX_SIZE							(1024 * 256 - 8) // Note that the bootloader needs 8 extra bytes
 #define QMLUI_BASE								9
 #define LISP_BASE								10
 #define LISP_CONST_BASE							8
@@ -55,10 +55,6 @@
 #define ADDR_FLASH_SECTOR_5    					((uint32_t)0x08020000) // Base @ of Sector 5, 128 Kbytes
 #define ADDR_FLASH_SECTOR_6     				((uint32_t)0x08040000) // Base @ of Sector 6, 128 Kbytes
 #define ADDR_FLASH_SECTOR_7     				((uint32_t)0x08060000) // Base @ of Sector 7, 128 Kbytes
-#define ADDR_FLASH_SECTOR_8     				((uint32_t)0x08080000) // Base @ of Sector 8, 128 Kbytes
-#define ADDR_FLASH_SECTOR_9 				    ((uint32_t)0x080A0000) // Base @ of Sector 9, 128 Kbytes
-#define ADDR_FLASH_SECTOR_10				    ((uint32_t)0x080C0000) // Base @ of Sector 10, 128 Kbytes
-#define ADDR_FLASH_SECTOR_11				    ((uint32_t)0x080E0000) // Base @ of Sector 11, 128 Kbytes
 
 #define VECTOR_TABLE_ADDRESS					((uint32_t*)ADDR_FLASH_SECTOR_0)
 #define VECTOR_TABLE_SIZE						((uint32_t)(ADDR_FLASH_SECTOR_1 - ADDR_FLASH_SECTOR_0))
@@ -104,11 +100,7 @@ static const uint32_t flash_addr[FLASH_SECTORS] = {
 		ADDR_FLASH_SECTOR_4,
 		ADDR_FLASH_SECTOR_5,
 		ADDR_FLASH_SECTOR_6,
-		ADDR_FLASH_SECTOR_7,
-		ADDR_FLASH_SECTOR_8,
-		ADDR_FLASH_SECTOR_9,
-		ADDR_FLASH_SECTOR_10,
-		ADDR_FLASH_SECTOR_11
+		ADDR_FLASH_SECTOR_7
 };
 static const uint16_t flash_sector[FLASH_SECTORS] = {
 		FLASH_Sector_0,
@@ -118,11 +110,7 @@ static const uint16_t flash_sector[FLASH_SECTORS] = {
 		FLASH_Sector_4,
 		FLASH_Sector_5,
 		FLASH_Sector_6,
-		FLASH_Sector_7,
-		FLASH_Sector_8,
-		FLASH_Sector_9,
-		FLASH_Sector_10,
-		FLASH_Sector_11
+		FLASH_Sector_7
 };
 
 uint16_t flash_helper_erase_new_app(uint32_t new_app_size) {
@@ -473,48 +461,4 @@ static void qmlui_check(int ind) {
 	}
 
 	code_checks[ind].check_done = true;
-}
-
-#define VESC_IF_NVM_REGION_SIZE	(ADDR_FLASH_SECTOR_11 - ADDR_FLASH_SECTOR_10)
-
-/**
-  * @brief  Reads len bytes to v from nvm at address
-  * @param	v: array of bytes to which the result will be written
-  * @param	len: number of bytes to read
-  * @param	address: address of the first byte
-  * @retval Boolean indicating success or failure
-  */
-bool flash_helper_read_nvm(uint8_t *v, unsigned int len, unsigned int address) {
-	if ((address + len) > VESC_IF_NVM_REGION_SIZE) {
-		return false;
-	}
-
-	memcpy(v, (uint8_t*)(ADDR_FLASH_SECTOR_11 + address), len);
-
-	return true;
-}
-
-/**
-  * @brief  Writes len bytes from v to nvm at address
-  * @param	v: array of bytes to write
-  * @param	len: number of bytes to write
-  * @param	address: address of the first byte
-  * @retval Boolean indicating success or failure
-  */
-bool flash_helper_write_nvm(uint8_t *v, unsigned int len, unsigned int address) {
-	if ((address + len) > VESC_IF_NVM_REGION_SIZE) {
-		return false;
-	}
-
-	uint16_t res = write_data(ADDR_FLASH_SECTOR_11 + address, v, len);
-
-	return (res == FLASH_COMPLETE);
-}
-
-/**
-  * @brief  Erase region of NVM used by packages.
-  * @retval Boolean indicating success or failure
-  */
-bool flash_helper_wipe_nvm(void) {
-	return (erase_sector(flash_sector[11]) == FLASH_COMPLETE);
 }

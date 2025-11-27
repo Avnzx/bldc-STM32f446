@@ -135,7 +135,7 @@ systime_t last_read_file_req = 0;
 systime_t jump_delay_start = 0;
 bool jump_to_bootloader = false;
 
-#define FLASH_SECTORS			12
+#define FLASH_SECTORS		    8	
 #define BOOTLOADER_BASE			11
 #define APP_BASE				0
 #define APP_SECTORS				7
@@ -155,10 +155,6 @@ bool jump_to_bootloader = false;
 #define ADDR_FLASH_SECTOR_5     ((uint32_t)0x08020000) // Base @ of Sector 5, 128 Kbytes
 #define ADDR_FLASH_SECTOR_6     ((uint32_t)0x08040000) // Base @ of Sector 6, 128 Kbytes
 #define ADDR_FLASH_SECTOR_7     ((uint32_t)0x08060000) // Base @ of Sector 7, 128 Kbytes
-#define ADDR_FLASH_SECTOR_8     ((uint32_t)0x08080000) // Base @ of Sector 8, 128 Kbytes
-#define ADDR_FLASH_SECTOR_9     ((uint32_t)0x080A0000) // Base @ of Sector 9, 128 Kbytes
-#define ADDR_FLASH_SECTOR_10    ((uint32_t)0x080C0000) // Base @ of Sector 10, 128 Kbytes
-#define ADDR_FLASH_SECTOR_11    ((uint32_t)0x080E0000) // Base @ of Sector 11, 128 Kbytes
 
 static const uint32_t flash_addr[FLASH_SECTORS] = {
 	ADDR_FLASH_SECTOR_0,
@@ -168,11 +164,7 @@ static const uint32_t flash_addr[FLASH_SECTORS] = {
 	ADDR_FLASH_SECTOR_4,
 	ADDR_FLASH_SECTOR_5,
 	ADDR_FLASH_SECTOR_6,
-	ADDR_FLASH_SECTOR_7,
-	ADDR_FLASH_SECTOR_8,
-	ADDR_FLASH_SECTOR_9,
-	ADDR_FLASH_SECTOR_10,
-	ADDR_FLASH_SECTOR_11
+	ADDR_FLASH_SECTOR_7
 };
 
 /* 
@@ -926,214 +918,6 @@ static void handle_restart_node(void) {
 	for(;;){};
 }
 
-/*
- * Send a read for a fw update file
- * This request is sent after we recieve a begin firmware udpate request, and then
- * everytime we finish processing one chunk of the firmware file. It uses the 
- * fw_update.ofs value to keep track of what chunk of data needs to be requested.
- * We use fw_update.last_ms to give the server enough time to respond to the previous
- * request before we send a new one. The value is cleared after procesing a response
- * so that we dont have to wait 250ms before sending the next request.
- */
-static void send_fw_read(CanardInstance *ins)
-{
-	fw_update.ins = ins;
-
-	uint32_t now = ST2MS(chVTGetSystemTimeX());
-	if (now - fw_update.last_ms < 250) {
-		// the server may still be responding
-		return;
-	}
-	fw_update.last_ms = now;
-
-	canardEncodeScalar(msg_buffer, 0, 40, &fw_update.ofs);
-	uint32_t offset = 40;
-	uint8_t len = strlen((const char *)fw_update.path);
-	for (uint8_t i=0; i<len; i++) {
-		canardEncodeScalar(msg_buffer, offset, 8, &fw_update.path[i]);
-		offset += 8;
-	}
-	uint32_t total_size = (offset+7)/8;
-
-	canardRequestOrRespond(ins,
-						   fw_update.node_id,
-						   UAVCAN_PROTOCOL_FILE_READ_SIGNATURE,
-						   UAVCAN_PROTOCOL_FILE_READ_ID,
-						   &fw_update.transfer_id,
-						   CANARD_TRANSFER_PRIORITY_HIGH,
-						   CanardRequest,
-						   &msg_buffer[0],
-						   total_size);
-}
-
-/*
- * Handle response to file read request. This is called when we recieve a response to 
- * send_fw_read() above. the packet contains a 16 bit value at the begining called 
- * error that needs to be removed before reading the file chunk
- */
-static void handle_file_read_response(CanardInstance* ins, CanardRxTransfer* transfer) {
-	(void)ins;
-
-	if ((transfer->transfer_id+1)%256 != fw_update.transfer_id ||
-		transfer->source_node_id != fw_update.node_id) {
-		return;
-	}
-	int16_t error = 0;
-	canardDecodeScalar(transfer, 0, 16, true, (void*)&error);
-	uint16_t len = transfer->payload_len - 2;
-
-	uint32_t offset = 16;
-	uint32_t buf32[(len+3)/4];
-	uint8_t *buf = (uint8_t *)&buf32[0];
-	for (uint16_t i=0; i<len; i++) {
-		canardDecodeScalar(transfer, offset, 8, false, (void*)&buf[i]);
-		offset += 8;
-	}
-
-	if (debug_level == 9) {
-		commands_printf("UAVCAN read_response\nlen: %d\noffset: %d",len, fw_update.ofs);
-	}
-
-	// Write to flash, skip the first 6 bytes for Size and CRC so need to add 6 always
-	uint16_t flash_res = flash_helper_write_new_app_data(fw_update.ofs+6, buf, len);
-	fw_update.ofs += len;
-	
-	// TODO: Check result and abort on failure.
-	(void)flash_res;
-
-	// If the packet is incomplete that means that was the last packet (might be an issue if the last packet is exactly full)
-	// however Ardupilot seems to be handling this same way, and no issues have been reported so far.
-	if (len < UAVCAN_PROTOCOL_FILE_READ_RESPONSE_DATA_MAX_LENGTH) {
-		fw_update.node_id = 0;
-		const uint32_t app_size = (uint32_t)fw_update.ofs-6;
-		uint16_t app_crc = crc16((uint8_t *)ADDR_FLASH_SECTOR_8+6,app_size);
-		uint8_t sizecrc[6];
-		int32_t ind = 0;
-
-		uint32_t sizefromflash = 0;
-		uint16_t crc_app = 0;
-		uint32_t nextData = 0;
-
-		// This is debug stuff used to valiate the file transfer.
-		if (debug_level == 8) {
-			commands_printf("UAVCAN read_response transfer finished %d kB", fw_update.ofs / 1024U);
-			commands_printf("new app address: 0x%lx", flash_addr[NEW_APP_BASE]);
-			
-			// Print reserved space contents for size and crc
-			sizefromflash = buffer_get_uint32((uint8_t *)flash_addr[NEW_APP_BASE], &ind);
-			crc_app = buffer_get_uint16((uint8_t *)flash_addr[NEW_APP_BASE], &ind);
-			nextData = buffer_get_uint32((uint8_t *)flash_addr[NEW_APP_BASE], &ind);
-			commands_printf("orig size from flash: 0x%lx", (long)sizefromflash);
-			commands_printf("orig crc from flash: 0x%02hhX", crc_app);
-			commands_printf("orig nextData: 0x%08lx", (long)nextData);
-		}
-
-		// Calculate and write size and crc to start of reserved space
-		ind = 0;
-		buffer_append_uint32(sizecrc, app_size, &ind);
-		buffer_append_uint16(sizecrc, app_crc, &ind);
-
-		flash_res = flash_helper_write_new_app_data(0, sizecrc, sizeof(sizecrc));
-
-		if (debug_level == 8) {
-			// Print data for debuging
-			commands_printf("ofs: %ld", (long)fw_update.ofs);
-			commands_printf("len: %d", len);
-			commands_printf("Size: 0x%lx", (long)app_size);
-			commands_printf("crc16: 0x%02hhX", app_crc);
-			uint16_t app_crc1 = crc16((uint8_t *)flash_addr[APP_BASE],app_size);
-			commands_printf("app crc16: 0x%02hhX", app_crc1);
-			
-			// Print size and crc data read from flash after calculation and write
-			ind = 0;
-			sizefromflash = buffer_get_uint32((uint8_t *)flash_addr[NEW_APP_BASE], &ind);
-			crc_app = buffer_get_uint16((uint8_t *)flash_addr[NEW_APP_BASE], &ind);
-			commands_printf("size from flash: 0x%lx", (long)sizefromflash);
-			commands_printf("crc from flash: 0x%02hhX", crc_app);
-			nextData = buffer_get_uint32((uint8_t *)flash_addr[NEW_APP_BASE], &ind);
-			commands_printf("nextData: 0x%lx", (long)nextData);
-			ind = 0;
-			uint32_t appstartdata = buffer_get_uint32((uint8_t *)flash_addr[APP_BASE], &ind);
-			commands_printf("appStartData: 0x%08lx", appstartdata);
-			commands_printf("Jumping to Bootloader in 500ms!");
-			jump_delay_start = chVTGetSystemTimeX();
-		}
-
-		// Do not jump directly to the bootloader after finising the transfer in case we need time
-		// to allow other things to finish. Currently it only delays if it needs to print the debug
-		// data.
-		jump_to_bootloader = true;
-	}
-
-	// show offset number we are flashing in kbyte as crude progress indicator
-	node_status.vendor_specific_status_code = 1 + (fw_update.ofs / 1024U);
-
-	// Clear the counter so we dont delay the next request for data unecesarily 
-	fw_update.last_ms = 0;
-}
-
-/**
- * Handle a begin firmware update request. 
- * UAVCAN uses the file system requests to pull the firmware file from the host.
- * A begin firmware update call is made to tell the client node to ask the host
- * for the firmware file. From this point on the client basically becomes the host
- * for the file transfer until the file is received by sending requests for the 
- * next chunk of data every so often.
- */
-static void handle_begin_firmware_update(CanardInstance* ins, CanardRxTransfer* transfer)
-{
-	// manual decoding due to TAO bug in libcanard generated code
-	if (transfer->payload_len < 1 || transfer->payload_len > sizeof(fw_update.path)+1) {
-		return;
-	}
-
-	if (fw_update.node_id == 0) {
-		uint32_t offset = 0;
-		canardDecodeScalar(transfer, 0, 8, false, (void*)&fw_update.node_id);
-		offset += 8;
-		for (uint8_t i=0; i<transfer->payload_len-1; i++) {
-			canardDecodeScalar(transfer, offset, 8, false, (void*)&fw_update.path[i]);
-			offset += 8;
-		}
-
-		fw_update.ofs = 0;
-		fw_update.last_ms = 0;
-		fw_update.sector = 0;
-		fw_update.sector_ofs = 0;
-		if (fw_update.node_id == 0) {
-			last_read_file_req = chVTGetSystemTimeX();
-			fw_update.node_id = transfer->source_node_id;
-		}
-	}
-
-	uavcan_protocol_file_BeginFirmwareUpdateResponse reply;
-	memset(&reply, 0, sizeof(reply));
-
-	reply.error = UAVCAN_PROTOCOL_FILE_BEGINFIRMWAREUPDATE_RESPONSE_ERROR_OK;
-
-	uint32_t total_size = uavcan_protocol_file_BeginFirmwareUpdateResponse_encode(&reply, msg_buffer);
-	canardRequestOrRespond(ins,
-						   transfer->source_node_id,
-						   UAVCAN_PROTOCOL_FILE_BEGINFIRMWAREUPDATE_SIGNATURE,
-						   UAVCAN_PROTOCOL_FILE_BEGINFIRMWAREUPDATE_ID,
-						   &transfer->transfer_id,
-						   transfer->priority,
-						   CanardResponse,
-						   &msg_buffer[0],
-						   total_size);
-
-	// Erase the reserved flash for new app
-	flash_helper_erase_new_app(RESERVED_FLASH_SPACE_SIZE);
-
-	last_read_file_req = chVTGetSystemTimeX();
-
-	if (debug_level > 0) {
-		commands_printf("UAVCAN Begin firmware update from node_id: %d",fw_update.node_id);
-	}
-	
-	send_fw_read(ins);
-}
-
 /**
 * This callback is invoked by the library when a new message or request or response is received.
 */
@@ -1183,12 +967,9 @@ static void onTransferReceived(CanardInstance* ins, CanardRxTransfer* transfer) 
 			handle_param_getset(ins, transfer);
 			break;
 
+        // Removed because we don't have enough of a 'work area' in flash to do this!
 		case UAVCAN_PROTOCOL_FILE_BEGINFIRMWAREUPDATE_ID:
-			handle_begin_firmware_update(ins, transfer);
-			break;
-
 		case UAVCAN_PROTOCOL_FILE_READ_ID:
-			handle_file_read_response(ins, transfer);
 			break;
 	   }
 }
@@ -1435,12 +1216,7 @@ static THD_FUNCTION(canard_thread, arg) {
 			}
 		}
 
-		if ((ST2MS(chVTTimeElapsedSinceX(last_read_file_req)) >= 10) && (fw_update.node_id != 0)) {
-			last_read_file_req = chVTGetSystemTimeX();
-			send_fw_read(fw_update.ins);
-		}
-
-		// delay jump to bootloader after receiving data for 0.5 sec
+        // delay jump to bootloader after receiving data for 0.5 sec
 		if ((ST2MS(chVTTimeElapsedSinceX(jump_delay_start)) >= 500) && (jump_to_bootloader == true)) {
 			flash_helper_jump_to_bootloader();
 		}

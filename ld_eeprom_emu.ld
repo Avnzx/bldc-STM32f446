@@ -25,33 +25,39 @@
  */
 MEMORY
 {
-    flash : org = 0x08000000, len = 16k
-    flash2 : org = 0x0800C000, len = 512k - 48k - 16	/* NEW_APP_MAX_SIZE - CRC_INFO */
-	crcinfo : org = 0x0807FFF0, len = 8		/* CRC info */
-    ram0  : org = 0x20000000, len = 128k    /* SRAM1 + SRAM2 */
-    ram1  : org = 0x20000000, len = 112k    /* SRAM1 */
-    ram2  : org = 0x2001C000, len = 16k     /* SRAM2 */
+    flash   : org = 0x08000000, len = 16k               /* XXX FLASH */
+    /* 32k (2 x 16k) pages of FLASH between flash1/2 used for EEPROM Emulation!*/ 
+    /* eeprom : org = 0x08004000 */
+    flash2  : org = 0x0800C000, len = 256k - 16 - 48k   /* NEW_APP_MAX_SIZE - CRC_INFO XXX FLASH */
+    crcinfo : org = 0x0803FFF0, len = 8		            /* CRC info XXX FLASH */
+    ram4    : org = 0x20000000, len = 128k              /* WAS CCM now XXX SRAM1+2 (128k) */
+
+
+
+
+    ram0  : org = 0x20000000, len = 0       /* SRAM1 + SRAM2 */
+    ram1  : org = 0x20000000, len = 0       /* SRAM1 */
+    ram2  : org = 0x2001C000, len = 0       /* SRAM2 */
     ram3  : org = 0x00000000, len = 0
-    ram4  : org = 0x10000000, len = 62k     /* CCM SRAM */
-    libif : org = 0x1000F800, len = 2k
-    ram5  : org = 0x40024000, len = 4k      /* BCKP SRAM */
+    ram5  : org = 0x40024000, len = 0       /* BCKP SRAM */
     ram6  : org = 0x00000000, len = 0
     ram7  : org = 0x00000000, len = 0
+    libif : org = 0x1000F800, len = 0       /* */
 }
 
 /* RAM region to be used for Main stack. This stack accommodates the processing
    of all exceptions and interrupts*/
-REGION_ALIAS("MAIN_STACK_RAM", ram0);
+REGION_ALIAS("MAIN_STACK_RAM", ram4);
 
 /* RAM region to be used for the process stack. This is the stack used by
    the main() function.*/
-REGION_ALIAS("PROCESS_STACK_RAM", ram0);
+REGION_ALIAS("PROCESS_STACK_RAM", ram4);
 
 /* RAM region to be used for data segment.*/
-REGION_ALIAS("DATA_RAM", ram0);
+REGION_ALIAS("DATA_RAM", ram4);
 
 /* RAM region to be used for BSS segment.*/
-REGION_ALIAS("BSS_RAM", ram0);
+REGION_ALIAS("BSS_RAM", ram4);
 
 __ram0_start__          = ORIGIN(ram0);
 __ram0_size__           = LENGTH(ram0);
@@ -153,7 +159,7 @@ SECTIONS
     _etext = .;
     _textdata = _etext;
     
-    _crcinfo_start_address = 0x0807FFF0;
+    _crcinfo_start_address = 0x0803FFF0;
     
     .crcinfo _crcinfo_start_address :
 	{
@@ -209,7 +215,7 @@ SECTIONS
         *(.ram0.*)
         . = ALIGN(4);
         __ram0_free__ = .;
-    } > ram0
+    } > ram4
 
     .ram1 (NOLOAD) : ALIGN(4)
     {
@@ -283,5 +289,5 @@ SECTIONS
 
 /* Heap default boundaries, it is defaulted to be the non-used part
    of ram0 region.*/
-__heap_base__   = __ram0_free__;
-__heap_end__    = __ram0_end__;
+__heap_base__   = __ram4_free__;
+__heap_end__    = __ram4_end__;
