@@ -98,9 +98,6 @@ typedef struct {
 
 // Private variables
 static volatile motor_if_state_t m_motor_1;
-#ifdef HW_HAS_DUAL_MOTORS
-static volatile motor_if_state_t m_motor_2;
-#endif
 
 // Sampling variables
 #ifndef ADC_SAMPLE_MAX_LEN
@@ -167,19 +164,10 @@ static THD_FUNCTION(stat_thread, arg);
 
 void mc_interface_init(void) {
 	memset((void*)&m_motor_1, 0, sizeof(motor_if_state_t));
-#ifdef HW_HAS_DUAL_MOTORS
-	memset((void*)&m_motor_2, 0, sizeof(motor_if_state_t));
-#endif
 
 	conf_general_read_mc_configuration((mc_configuration*)&m_motor_1.m_conf, false);
-#ifdef HW_HAS_DUAL_MOTORS
-	conf_general_read_mc_configuration((mc_configuration*)&m_motor_2.m_conf, true);
-#endif
 
-#ifdef HW_HAS_DUAL_MOTORS
 	m_motor_1.m_conf.motor_type = MOTOR_TYPE_FOC;
-	m_motor_2.m_conf.motor_type = MOTOR_TYPE_FOC;
-#endif
 
 	m_last_adc_duration_sample = 0.0;
 	m_sample_len = 1000;
@@ -214,20 +202,6 @@ void mc_interface_init(void) {
 	DRV8323S_CUSTOM_SETTINGS();
 #endif
 
-#if defined HW_HAS_DUAL_MOTORS || defined HW_HAS_DUAL_PARALLEL
-	mc_interface_select_motor_thread(2);
-#ifdef HW_HAS_DRV8301
-	drv8301_set_oc_mode(motor_now()->m_conf.m_drv8301_oc_mode);
-	drv8301_set_oc_adj(motor_now()->m_conf.m_drv8301_oc_adj);
-#elif defined(HW_HAS_DRV8320S)
-	drv8320s_set_oc_mode(motor_now()->m_conf.m_drv8301_oc_mode);
-	drv8320s_set_oc_adj(motor_now()->m_conf.m_drv8301_oc_adj);
-#elif defined(HW_HAS_DRV8323S)
-	drv8323s_set_oc_mode(motor_now()->m_conf.m_drv8301_oc_mode);
-	drv8323s_set_oc_adj(motor_now()->m_conf.m_drv8301_oc_adj);
-	DRV8323S_CUSTOM_SETTINGS();
-#endif
-#endif
 	mc_interface_select_motor_thread(motor_old);
 
 	encoder_init(&motor_now()->m_conf);
@@ -240,11 +214,7 @@ void mc_interface_init(void) {
 		break;
 
 	case MOTOR_TYPE_FOC:
-#ifdef HW_HAS_DUAL_MOTORS
-		mcpwm_foc_init((mc_configuration*)&m_motor_1.m_conf, (mc_configuration*)&m_motor_2.m_conf);
-#else
 		mcpwm_foc_init((mc_configuration*)&m_motor_1.m_conf, (mc_configuration*)&m_motor_1.m_conf);
-#endif
 		break;
 
 	default:
@@ -255,20 +225,7 @@ void mc_interface_init(void) {
 }
 
 int mc_interface_motor_now(void) {
-#if defined HW_HAS_DUAL_MOTORS || defined HW_HAS_DUAL_PARALLEL
-	int isr_motor = mcpwm_foc_isr_motor();
-	int thd_motor = chThdGetSelfX()->motor_selected;
-
-	if (isr_motor > 0) {
-		return isr_motor;
-	} else if (thd_motor > 0) {
-		return thd_motor;
-	} else {
-		return 1;
-	}
-#else
 	return 1;
-#endif
 }
 
 /**
@@ -282,13 +239,7 @@ int mc_interface_motor_now(void) {
  * 2: motor 2 selected.
  */
 void mc_interface_select_motor_thread(int motor) {
-#if defined HW_HAS_DUAL_MOTORS || defined HW_HAS_DUAL_PARALLEL
-	if (motor == 0 || motor == 1 || motor == 2) {
-		chThdGetSelfX()->motor_selected = motor;
-	}
-#else
 	(void)motor;
-#endif
 }
 
 /**
@@ -310,16 +261,6 @@ const volatile mc_configuration* mc_interface_get_configuration(void) {
 void mc_interface_set_configuration(mc_configuration *configuration) {
 	volatile motor_if_state_t *motor = motor_now();
 
-#if defined HW_HAS_DUAL_PARALLEL
-	configuration->motor_type = MOTOR_TYPE_FOC;
-#else
-#ifdef HW_HAS_DUAL_MOTORS
-#ifndef HW_SET_SINGLE_MOTOR
-	configuration->motor_type = MOTOR_TYPE_FOC;
-#endif
-#endif
-#endif
-
 	if (motor->m_conf.m_sensor_port_mode != configuration->m_sensor_port_mode) {
 		encoder_deinit();
 		encoder_init(configuration);
@@ -338,32 +279,9 @@ void mc_interface_set_configuration(mc_configuration *configuration) {
 	drv8323s_set_oc_adj(configuration->m_drv8301_oc_adj);
 #endif
 
-#ifdef HW_HAS_DUAL_PARALLEL
-	mc_interface_select_motor_thread(2);
-#ifdef HW_HAS_DRV8301
-	drv8301_set_oc_mode(configuration->m_drv8301_oc_mode);
-	drv8301_set_oc_adj(configuration->m_drv8301_oc_adj);
-#elif defined(HW_HAS_DRV8320S)
-	drv8320s_set_oc_mode(configuration->m_drv8301_oc_mode);
-	drv8320s_set_oc_adj(configuration->m_drv8301_oc_adj);
-#elif defined(HW_HAS_DRV8323S)
-	drv8323s_set_oc_mode(configuration->m_drv8301_oc_mode);
-	drv8323s_set_oc_adj(configuration->m_drv8301_oc_adj);
-#endif
-	mc_interface_select_motor_thread(1);
-#endif
-
 	if (motor->m_conf.motor_type != configuration->motor_type) {
 		mcpwm_deinit();
 		mcpwm_foc_deinit();
-
-#ifdef HW_SET_SINGLE_MOTOR
-		if (configuration->motor_type == MOTOR_TYPE_FOC) {
-			hw_init_gpio();
-		} else {
-			HW_SET_SINGLE_MOTOR();
-		}
-#endif
 
 		motor->m_conf = *configuration;
 
@@ -372,13 +290,8 @@ void mc_interface_set_configuration(mc_configuration *configuration) {
 		case MOTOR_TYPE_DC:
 			mcpwm_init(&motor->m_conf);
 			break;
-
 		case MOTOR_TYPE_FOC:
-#ifdef HW_HAS_DUAL_MOTORS
-			mcpwm_foc_init((mc_configuration*)&m_motor_1.m_conf, (mc_configuration*)&m_motor_2.m_conf);
-#else
 			mcpwm_foc_init((mc_configuration*)&m_motor_1.m_conf, (mc_configuration*)&m_motor_1.m_conf);
-#endif
 			break;
 
 		default:
@@ -397,15 +310,6 @@ void mc_interface_set_configuration(mc_configuration *configuration) {
 		break;
 
 	case MOTOR_TYPE_FOC:
-#ifdef HW_HAS_DUAL_MOTORS
-		if (motor == &m_motor_1) {
-			m_motor_2.m_conf.foc_f_zv = motor->m_conf.foc_f_zv;
-			m_motor_2.m_conf.motor_type = motor->m_conf.motor_type;
-		} else {
-			m_motor_1.m_conf.foc_f_zv = motor->m_conf.foc_f_zv;
-			m_motor_1.m_conf.motor_type = motor->m_conf.motor_type;
-		}
-#endif
 		mcpwm_foc_set_configuration((mc_configuration*)&motor->m_conf);
 		break;
 
@@ -1509,9 +1413,6 @@ void mc_interface_sample_print_data(debug_sampling_mode mode, uint16_t len, uint
 		m_sample_int = decimation;
 		m_sample_mode = mode;
 		m_sample_raw = raw;
-#ifdef HW_HAS_DUAL_MOTORS
-		m_sample_is_second_motor = motor_now() == &m_motor_2;
-#endif
 	}
 }
 
@@ -1724,10 +1625,6 @@ void mc_interface_ignore_input(int time_ms) {
  */
 void mc_interface_ignore_input_both(int time_ms) {
 	m_motor_1.m_ignore_iterations = time_ms;
-
-#ifdef HW_HAS_DUAL_MOTORS
-	m_motor_2.m_ignore_iterations = time_ms;
-#endif
 }
 
 void mc_interface_release_motor_override_both(void) {
@@ -1861,12 +1758,8 @@ void mc_interface_fault_stop(mc_fault_code fault, bool is_second_motor, bool is_
 void mc_interface_mc_timer_isr(bool is_second_motor) {
 	ledpwm_update_pwm();
 
-#ifdef HW_HAS_DUAL_MOTORS
-	motor_if_state_t *motor = is_second_motor ? (motor_if_state_t*)&m_motor_2 : (motor_if_state_t*)&m_motor_1;
-#else
 	motor_if_state_t *motor = (motor_if_state_t*)&m_motor_1;
 	(void)is_second_motor;
-#endif
 
 	mc_configuration *conf_now = (mc_configuration*)&motor->m_conf;
 	const float input_voltage = GET_INPUT_VOLTAGE();
@@ -1966,12 +1859,7 @@ void mc_interface_mc_timer_isr(bool is_second_motor) {
 	}
 
 	// DRV fault code
-#ifdef HW_HAS_DUAL_PARALLEL
-	if (IS_DRV_FAULT() || IS_DRV_FAULT_2()) {
-		is_second_motor = IS_DRV_FAULT_2();
-#else
 	if (is_second_motor ? IS_DRV_FAULT_2() : IS_DRV_FAULT()) {
-#endif
 		mc_interface_fault_stop(FAULT_CODE_DRV, is_second_motor, true);
 	}
 
@@ -2239,11 +2127,7 @@ static void update_override_limits(volatile motor_if_state_t *motor, volatile mc
 
 	const float duty_now_abs = fabsf(mc_interface_get_duty_cycle_now());
 
-#ifdef HW_HAS_DUAL_PARALLEL
-	UTILS_LP_FAST(motor->m_temp_fet, fmaxf(NTC_TEMP(ADC_IND_TEMP_MOS), NTC_TEMP(ADC_IND_TEMP_MOS_M2)), 0.1);
-#else
 	UTILS_LP_FAST(motor->m_temp_fet, NTC_TEMP(is_motor_1 ? ADC_IND_TEMP_MOS : ADC_IND_TEMP_MOS_M2), 0.1);
-#endif
 
 	float temp_motor = 0.0;
 
@@ -2512,11 +2396,7 @@ static void update_override_limits(volatile motor_if_state_t *motor, volatile mc
 }
 
 static volatile motor_if_state_t *motor_now(void) {
-#ifdef HW_HAS_DUAL_MOTORS
-	return mc_interface_motor_now() == 1 ? &m_motor_1 : &m_motor_2;
-#else
 	return &m_motor_1;
-#endif
 }
 
 static void run_timer_tasks(volatile motor_if_state_t *motor) {
