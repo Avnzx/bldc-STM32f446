@@ -58,7 +58,7 @@
 
 #define VECTOR_TABLE_ADDRESS					((uint32_t*)ADDR_FLASH_SECTOR_0)
 #define VECTOR_TABLE_SIZE						((uint32_t)(ADDR_FLASH_SECTOR_1 - ADDR_FLASH_SECTOR_0))
-#define EEPROM_EMULATION_SIZE					((uint32_t)(ADDR_FLASH_SECTOR_4 - ADDR_FLASH_SECTOR_2))
+#define EEPROM_EMULATION_SIZE					((uint32_t)(ADDR_FLASH_SECTOR_3 - ADDR_FLASH_SECTOR_1))
 
 #define APP_START_ADDRESS						((uint32_t*)(ADDR_FLASH_SECTOR_3))
 #define APP_SIZE								((uint32_t)(APP_MAX_SIZE - VECTOR_TABLE_SIZE - EEPROM_EMULATION_SIZE))
@@ -78,18 +78,11 @@ typedef struct {
 const crc_info_t __attribute__((section (".crcinfo"))) crc_info = {0xFFFFFFFF, 0xFFFFFFFF};
 
 // Private functions
-static uint16_t erase_sector(uint32_t sector);
-static uint16_t write_data(uint32_t base, uint8_t *data, uint32_t len);
-static void qmlui_check(int ind);
-
 // Private variables
 typedef struct {
 	bool check_done;
 	bool ok;
 } _code_checks;
-
-static _code_checks code_checks[3] = {0};
-static int code_sectors[3] = {QMLUI_BASE, LISP_BASE, LISP_CONST_BASE};
 
 // Private constants
 static const uint32_t flash_addr[FLASH_SECTORS] = {
@@ -112,118 +105,6 @@ static const uint16_t flash_sector[FLASH_SECTORS] = {
 		FLASH_Sector_6,
 		FLASH_Sector_7
 };
-
-uint16_t flash_helper_erase_new_app(uint32_t new_app_size) {
-	FLASH_Unlock();
-	FLASH_ClearFlag(FLASH_FLAG_OPERR | FLASH_FLAG_WRPERR | FLASH_FLAG_PGAERR |
-			FLASH_FLAG_PGPERR | FLASH_FLAG_PGSERR);
-
-	new_app_size += flash_addr[NEW_APP_BASE];
-
-	mc_interface_ignore_input_both(5000);
-	mc_interface_release_motor_override_both();
-
-	if (!mc_interface_wait_for_motor_release_both(3.0)) {
-		return 100;
-	}
-
-	utils_sys_lock_cnt();
-	timeout_configure_IWDT_slowest();
-
-	for (int i = 0;i < NEW_APP_SECTORS;i++) {
-		if (new_app_size > flash_addr[NEW_APP_BASE + i]) {
-			uint16_t res = FLASH_EraseSector(flash_sector[NEW_APP_BASE + i], ERASE_VOLTAGE_RANGE);
-			if (res != FLASH_COMPLETE) {
-				FLASH_Lock();
-				timeout_configure_IWDT();
-				mc_interface_ignore_input_both(5000);
-				utils_sys_unlock_cnt();
-				return res;
-			}
-		} else {
-			break;
-		}
-	}
-
-	FLASH_Lock();
-	timeout_configure_IWDT();
-	mc_interface_ignore_input_both(100);
-	utils_sys_unlock_cnt();
-
-	return FLASH_COMPLETE;
-}
-
-uint16_t flash_helper_erase_bootloader(void) {
-	return erase_sector(flash_sector[BOOTLOADER_BASE]);
-}
-
-uint16_t flash_helper_write_new_app_data(uint32_t offset, uint8_t *data, uint32_t len) {
-	return write_data(flash_addr[NEW_APP_BASE] + offset, data, len);
-}
-
-uint16_t flash_helper_erase_code(int ind) {
-	uint8_t *ptr = flash_helper_code_data_raw(ind);
-
-	bool has_data = false;
-	for (int i = 0;i < (1024 * 128); i++) {
-		if (*ptr != 0xFF) {
-			has_data = true;
-			break;
-		}
-	}
-
-	if (!has_data) {
-		return FLASH_COMPLETE;
-	}
-
-	code_checks[ind].check_done = false;
-	code_checks[ind].ok = false;
-	return erase_sector(flash_sector[code_sectors[ind]]);
-}
-
-uint16_t flash_helper_write_code(int ind, uint32_t offset, uint8_t *data, uint32_t len) {
-	code_checks[ind].check_done = false;
-	code_checks[ind].ok = false;
-	return write_data(flash_addr[code_sectors[ind]] + offset, data, len);
-}
-
-uint8_t* flash_helper_code_data(int ind) {
-	qmlui_check(ind);
-
-	if (code_checks[ind].check_done && code_checks[ind].ok) {
-		return (uint8_t*)(flash_addr[code_sectors[ind]]) + 8;
-	} else {
-		return 0;
-	}
-}
-
-uint8_t* flash_helper_code_data_raw(int ind) {
-	return (uint8_t*)flash_addr[code_sectors[ind]];
-}
-
-uint32_t flash_helper_code_size(int ind) {
-	qmlui_check(ind);
-
-	if (code_checks[ind].check_done && code_checks[ind].ok) {
-		uint8_t *base = (uint8_t*)(flash_addr[code_sectors[ind]]);
-		int32_t index = 0;
-		return buffer_get_uint32(base, &index);
-	} else {
-		return 0;
-	}
-}
-
-uint16_t flash_helper_code_flags(int ind) {
-	qmlui_check(ind);
-
-	if (code_checks[ind].check_done && code_checks[ind].ok) {
-		uint8_t *base = (uint8_t*)(flash_addr[code_sectors[ind]]);
-		int32_t index = 6;
-		return buffer_get_uint16(base, &index);
-	} else {
-		return 0;
-	}
-}
 
 /**
  * Stop the system and jump to the bootloader.
@@ -383,82 +264,4 @@ uint32_t flash_helper_verify_flash_memory_chunk(void) {
 
 uint32_t flash_helper_app_crc(void) {
 	return *APP_CRC_ADDRESS;
-}
-
-static uint16_t erase_sector(uint32_t sector) {
-	FLASH_Unlock();
-	FLASH_ClearFlag(FLASH_FLAG_OPERR | FLASH_FLAG_WRPERR | FLASH_FLAG_PGAERR |
-			FLASH_FLAG_PGPERR | FLASH_FLAG_PGSERR);
-
-	mc_interface_ignore_input_both(5000);
-	mc_interface_release_motor_override_both();
-
-	if (!mc_interface_wait_for_motor_release_both(3.0)) {
-		return 100;
-	}
-
-	utils_sys_lock_cnt();
-	timeout_configure_IWDT_slowest();
-
-	uint16_t res = FLASH_EraseSector(sector, ERASE_VOLTAGE_RANGE);
-
-	FLASH_Lock();
-	timeout_configure_IWDT();
-	mc_interface_ignore_input_both(100);
-	utils_sys_unlock_cnt();
-	return res;
-}
-
-static uint16_t write_data(uint32_t base, uint8_t *data, uint32_t len) {
-	FLASH_Unlock();
-	FLASH_ClearFlag(FLASH_FLAG_OPERR | FLASH_FLAG_WRPERR | FLASH_FLAG_PGAERR |
-			FLASH_FLAG_PGPERR | FLASH_FLAG_PGSERR);
-
-	mc_interface_ignore_input_both(5000);
-	mc_interface_release_motor_override_both();
-
-	if (!mc_interface_wait_for_motor_release_both(3.0)) {
-		return 100;
-	}
-
-	utils_sys_lock_cnt();
-	timeout_configure_IWDT_slowest();
-
-	for (uint32_t i = 0;i < len;i++) {
-		uint16_t res = FLASH_ProgramByte(base + i, data[i]);
-		if (res != FLASH_COMPLETE) {
-			FLASH_Lock();
-			timeout_configure_IWDT();
-			mc_interface_ignore_input_both(5000);
-			utils_sys_unlock_cnt();
-			return res;
-		}
-	}
-
-	FLASH_Lock();
-	timeout_configure_IWDT();
-	mc_interface_ignore_input_both(100);
-	utils_sys_unlock_cnt();
-
-	return FLASH_COMPLETE;
-}
-
-static void qmlui_check(int ind) {
-	if (code_checks[ind].check_done) {
-		return;
-	}
-
-	uint8_t *base = (uint8_t*)(flash_addr[code_sectors[ind]]);
-	int32_t index = 0;
-	uint32_t qmlui_len = buffer_get_uint32(base, &index);
-	uint16_t qmlui_crc = buffer_get_uint16(base, &index);
-
-	if (qmlui_len <= QMLUI_MAX_SIZE) {
-		uint16_t crc_calc = crc16(base + index, qmlui_len + 2); // CRC includes the 2 byte flags
-		code_checks[ind].ok = crc_calc == qmlui_crc;
-	} else {
-		code_checks[ind].ok = false;
-	}
-
-	code_checks[ind].check_done = true;
 }

@@ -210,31 +210,6 @@ bool main_init_done(void) {
 	return m_init_done;
 }
 
-uint32_t main_calc_hw_crc(void) {
-	uint32_t crc = 0;
-
-#ifdef QMLUI_SOURCE_HW
-	crc = crc32_with_init(data_qml_hw, DATA_QML_HW_SIZE, crc);
-#endif
-
-	for (int i = 0;i < conf_custom_cfg_num();i++) {
-		uint8_t *data = 0;
-		int len = conf_custom_get_cfg_xml(i, &data);
-		if (len > 0) {
-			crc = crc32_with_init(data, len, crc);
-		}
-	}
-
-	if (flash_helper_code_size(CODE_IND_QML) > 0) {
-		crc = crc32_with_init(
-				flash_helper_code_data(CODE_IND_QML),
-				flash_helper_code_size(CODE_IND_QML),
-				crc);
-	}
-
-	return crc;
-}
-
 int main(void) {
 	halInit();
 	chSysInit();

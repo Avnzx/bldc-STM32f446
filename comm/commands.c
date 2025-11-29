@@ -269,95 +269,55 @@ void commands_process_packet(unsigned char *data, unsigned int len,
 		send_buffer[ind++] = 1;
 #endif
 #else
-		if (flash_helper_code_data(CODE_IND_QML)) {
-			send_buffer[ind++] = flash_helper_code_flags(CODE_IND_QML);
-		} else {
-			send_buffer[ind++] = 0;
-		}
+        send_buffer[ind++] = 0;
 #endif
 		send_buffer[ind++] = nrf_flags;
 
 		strcpy((char*)(send_buffer + ind), FW_NAME);
 		ind += strlen(FW_NAME) + 1;
 
-		buffer_append_uint32(send_buffer, main_calc_hw_crc(), &ind);
+		buffer_append_uint32(send_buffer, 0, &ind);
 
 		fw_version_sent_cnt++;
 
 		reply_func(send_buffer, ind);
 	} break;
 
+
+	case COMM_LISP_SET_RUNNING:
+	case COMM_LISP_GET_STATS:
+	case COMM_LISP_REPL_CMD:
+	case COMM_LISP_STREAM_CODE:
+	case COMM_LISP_RMSG:
 	case COMM_JUMP_TO_BOOTLOADER_ALL_CAN:
-		data[-1] = COMM_JUMP_TO_BOOTLOADER;
-		comm_can_send_buffer(255, data - 1, len + 1, 2);
-		chThdSleepMilliseconds(100);
-		/* Falls through. */
-		/* no break */
 	case COMM_JUMP_TO_BOOTLOADER:
-		flash_helper_jump_to_bootloader();
+		//flash_helper_jump_to_bootloader(); <--- What bootloader :skull:
 		break;
 
+
+	case COMM_GET_QML_UI_APP:
+	case COMM_LISP_READ_CODE:
+	case COMM_QMLUI_ERASE:
+	case COMM_LISP_ERASE_CODE:
+	case COMM_QMLUI_WRITE:
+	case COMM_LISP_WRITE_CODE:
+	case COMM_GET_DECODED_ADC:
+	case COMM_GET_DECODED_CHUK:
+    case COMM_ERASE_BOOTLOADER_ALL_CAN:
+	case COMM_ERASE_BOOTLOADER:
 	case COMM_ERASE_NEW_APP_ALL_CAN:
-		data[-1] = COMM_ERASE_NEW_APP;
-		comm_can_send_buffer(255, data - 1, len + 1, 2);
-		chThdSleepMilliseconds(1500);
-		/* Falls through. */
-		/* no break */
-	case COMM_ERASE_NEW_APP: {
-		int32_t ind = 0;
-
-		uint16_t flash_res = flash_helper_erase_new_app(buffer_get_uint32(data, &ind));
-
-		ind = 0;
-		uint8_t send_buffer[50];
-		send_buffer[ind++] = COMM_ERASE_NEW_APP;
-		send_buffer[ind++] = flash_res == FLASH_COMPLETE ? 1 : 0;
-		reply_func(send_buffer, ind);
-	} break;
-
 	case COMM_WRITE_NEW_APP_DATA_ALL_CAN_LZO:
 	case COMM_WRITE_NEW_APP_DATA_ALL_CAN:
-		if (packet_id == COMM_WRITE_NEW_APP_DATA_ALL_CAN_LZO) {
-			uint8_t *send_buffer_global = mempools_get_packet_buffer();
-			memcpy(send_buffer_global, data + 6, len - 6);
-			int32_t ind = 4;
-			lzo_uint decompressed_len = buffer_get_uint16(data, &ind);
-			lzo1x_decompress_safe(send_buffer_global, len - 6, data + 4, &decompressed_len, NULL);
-			mempools_free_packet_buffer(send_buffer_global);
-			len = decompressed_len + 4;
-		}
-
-		data[-1] = COMM_WRITE_NEW_APP_DATA;
-
-		comm_can_send_buffer(255, data - 1, len + 1, 2);
-		/* Falls through. */
-		/* no break */
 	case COMM_WRITE_NEW_APP_DATA_LZO:
-	case COMM_WRITE_NEW_APP_DATA: {
-		if (packet_id == COMM_WRITE_NEW_APP_DATA_LZO) {
-			uint8_t *send_buffer_global = mempools_get_packet_buffer();
-			memcpy(send_buffer_global, data + 6, len - 6);
-			int32_t ind = 4;
-			lzo_uint decompressed_len = buffer_get_uint16(data, &ind);
-			lzo1x_decompress_safe(send_buffer_global, len - 6, data + 4, &decompressed_len, NULL);
-			mempools_free_packet_buffer(send_buffer_global);
-			len = decompressed_len + 4;
-		}
-
+	case COMM_WRITE_NEW_APP_DATA:
+	case COMM_ERASE_NEW_APP: {
+        // FIXME AAVIN: Should this return 1 (FLASH_COMPLETE) or 0 (incomplete??)
 		int32_t ind = 0;
-		uint32_t new_app_offset = buffer_get_uint32(data, &ind);
-
-		uint16_t flash_res = flash_helper_write_new_app_data(new_app_offset, data + ind, len - ind);
-
-		SHUTDOWN_RESET();
-
-		ind = 0;
 		uint8_t send_buffer[50];
-		send_buffer[ind++] = COMM_WRITE_NEW_APP_DATA;
-		send_buffer[ind++] = flash_res == FLASH_COMPLETE ? 1 : 0;
-		buffer_append_uint32(send_buffer, new_app_offset, &ind);
+		send_buffer[ind++] = packet_id;
+		send_buffer[ind++] = 0;
 		reply_func(send_buffer, ind);
-	} break;
+    } break;
 
 	case COMM_GET_VALUES:
 	case COMM_GET_VALUES_SELECTIVE: {
@@ -673,19 +633,6 @@ void commands_process_packet(unsigned char *data, unsigned int len,
 		reply_func(send_buffer, ind);
 	} break;
 
-	case COMM_GET_DECODED_ADC: {
-		int32_t ind = 0;
-		uint8_t send_buffer[50];
-		send_buffer[ind++] = COMM_GET_DECODED_ADC;
-		reply_func(send_buffer, ind);
-	} break;
-
-	case COMM_GET_DECODED_CHUK: {
-		int32_t ind = 0;
-		uint8_t send_buffer[50];
-		send_buffer[ind++] = COMM_GET_DECODED_CHUK;
-		reply_func(send_buffer, ind);
-	} break;
 
 	case COMM_FORWARD_CAN: {
 		send_func_can_fwd = reply_func;
@@ -949,24 +896,6 @@ void commands_process_packet(unsigned char *data, unsigned int len,
 		reply_func(send_buffer, ind);
 	} break;
 
-	case COMM_ERASE_BOOTLOADER_ALL_CAN:
-		data[-1] = COMM_ERASE_BOOTLOADER;
-		comm_can_send_buffer(255, data - 1, len + 1, 2);
-		chThdSleepMilliseconds(1500);
-		/* Falls through. */
-		/* no break */
-	case COMM_ERASE_BOOTLOADER: {
-		int32_t ind = 0;
-
-		uint16_t flash_res = flash_helper_erase_bootloader();
-
-		ind = 0;
-		uint8_t send_buffer[50];
-		send_buffer[ind++] = COMM_ERASE_BOOTLOADER;
-		send_buffer[ind++] = flash_res == FLASH_COMPLETE ? 1 : 0;
-		reply_func(send_buffer, ind);
-	} break;
-
 	case COMM_SET_CURRENT_REL: {
 		int32_t ind = 0;
 		mc_interface_set_current_rel(buffer_get_float32(data, 1e5, &ind));
@@ -1142,80 +1071,6 @@ void commands_process_packet(unsigned char *data, unsigned int len,
 #endif
 	} break;
 
-	case COMM_GET_QML_UI_APP:
-	case COMM_LISP_READ_CODE: {
-		int32_t ind = 0;
-
-		int32_t len_qml = buffer_get_int32(data, &ind);
-		int32_t ofs_qml = buffer_get_int32(data, &ind);
-
-		uint8_t *qmlui_data = flash_helper_code_data(CODE_IND_QML);
-		int32_t qmlui_len = flash_helper_code_size(CODE_IND_QML);
-
-#ifdef QMLUI_SOURCE_APP
-		qmlui_data = data_qml_app;
-		qmlui_len = DATA_QML_APP_SIZE;
-#endif
-
-		if (packet_id == COMM_LISP_READ_CODE) {
-			qmlui_data = flash_helper_code_data(CODE_IND_LISP);
-			qmlui_len = flash_helper_code_size(CODE_IND_LISP);
-		}
-
-		if (!qmlui_data) {
-			ind = 0;
-			uint8_t send_buffer[50];
-			send_buffer[ind++] = packet_id;
-			buffer_append_int32(send_buffer, 0, &ind);
-			buffer_append_int32(send_buffer, 0, &ind);
-			reply_func(send_buffer, ind);
-			break;
-		}
-
-		if ((len_qml + ofs_qml) > qmlui_len || len_qml > (PACKET_MAX_PL_LEN - 10)) {
-			break;
-		}
-
-		uint8_t *send_buffer_global = mempools_get_packet_buffer();
-		ind = 0;
-		send_buffer_global[ind++] = packet_id;
-		buffer_append_int32(send_buffer_global, qmlui_len, &ind);
-		buffer_append_int32(send_buffer_global, ofs_qml, &ind);
-		memcpy(send_buffer_global + ind, qmlui_data + ofs_qml, len_qml);
-		ind += len_qml;
-		reply_func(send_buffer_global, ind);
-		mempools_free_packet_buffer(send_buffer_global);
-	} break;
-
-	case COMM_QMLUI_ERASE:
-	case COMM_LISP_ERASE_CODE: {
-		uint16_t flash_res = flash_helper_erase_code(packet_id == COMM_QMLUI_ERASE ? CODE_IND_QML : CODE_IND_LISP);
-
-		int32_t ind = 0;
-		uint8_t send_buffer[50];
-		send_buffer[ind++] = packet_id;
-		send_buffer[ind++] = flash_res == FLASH_COMPLETE ? 1 : 0;
-		reply_func(send_buffer, ind);
-	} break;
-
-	case COMM_QMLUI_WRITE:
-	case COMM_LISP_WRITE_CODE: {
-		int32_t ind = 0;
-		uint32_t qmlui_offset = buffer_get_uint32(data, &ind);
-
-		uint16_t flash_res = flash_helper_write_code(packet_id == COMM_QMLUI_WRITE ? CODE_IND_QML : CODE_IND_LISP,
-				qmlui_offset, data + ind, len - ind);
-
-		SHUTDOWN_RESET();
-
-		ind = 0;
-		uint8_t send_buffer[50];
-		send_buffer[ind++] = packet_id;
-		send_buffer[ind++] = flash_res == FLASH_COMPLETE ? 1 : 0;
-		buffer_append_uint32(send_buffer, qmlui_offset, &ind);
-		reply_func(send_buffer, ind);
-	} break;
-
 	case COMM_IO_BOARD_GET_ALL: {
 		int32_t ind = 0;
 		int id = buffer_get_int16(data, &ind);
@@ -1342,13 +1197,6 @@ void commands_process_packet(unsigned char *data, unsigned int len,
 
 		reply_func(send_buffer, ind);
 	} break;
-
-	case COMM_LISP_SET_RUNNING:
-	case COMM_LISP_GET_STATS:
-	case COMM_LISP_REPL_CMD:
-	case COMM_LISP_STREAM_CODE:
-	case COMM_LISP_RMSG:
-	    break;	
 
 	case COMM_GET_CUSTOM_CONFIG:
 	case COMM_GET_CUSTOM_CONFIG_DEFAULT:
