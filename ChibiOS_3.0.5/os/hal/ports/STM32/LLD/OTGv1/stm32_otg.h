@@ -193,6 +193,8 @@ typedef struct {
 #define GOTGCTL_HSHNPEN         (1U<<10)    /**< Host Set HNP enable.       */
 #define GOTGCTL_HNPRQ           (1U<<9)     /**< HNP request.               */
 #define GOTGCTL_HNGSCS          (1U<<8)     /**< Host negotiation success.  */
+#define GOTGCTL_BVALOVAL        (1U<<7)     /**< B-peripheral session valid override value. */
+#define GOTGCTL_BVALOEN         (1U<<6)     /**< B-peripheral session valid override enable.*/
 #define GOTGCTL_SRQ             (1U<<1)     /**< Session request.           */
 #define GOTGCTL_SRQSCS          (1U<<0)     /**< Session request success.   */
 /** @} */

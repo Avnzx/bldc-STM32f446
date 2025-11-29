@@ -32,7 +32,7 @@
 /* Driver local definitions.                                                 */
 /*===========================================================================*/
 
-#define TRDT_VALUE              5
+#define TRDT_VALUE              6
 
 #define EP0_MAX_INSIZE          64
 #define EP0_MAX_OUTSIZE         64
@@ -838,6 +838,7 @@ void usb_lld_start(USBDriver *usbp) {
 #if defined(BOARD_OTG_NOVBUSSENS)
     // Keep VBUSASEN and VBUSBSEN at reset values... freaky
     otgp->GCCFG = (otgp->GCCFG & (~GCCFG_NOVBUSSENS)) | GCCFG_PWRDWN;
+    otgp->GOTGCTL = GOTGCTL_CIDSTS | GOTGCTL_BVALOEN | GOTGCTL_BVALOVAL;
 #else
     otgp->GCCFG = GCCFG_VBUSASEN | GCCFG_VBUSBSEN | GCCFG_PWRDWN;
 #endif
