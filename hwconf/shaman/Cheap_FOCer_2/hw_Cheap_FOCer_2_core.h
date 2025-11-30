@@ -93,10 +93,10 @@
 #define V_REG					3.3
 #endif
 #ifndef VIN_R1
-#define VIN_R1					39000.0
+#define VIN_R1					220000.0
 #endif
 #ifndef VIN_R2
-#define VIN_R2					2200.0
+#define VIN_R2					10000.0
 #endif
 #ifndef CURRENT_AMP_GAIN
 #ifdef CFOC_IS_V09
