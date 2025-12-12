@@ -28,7 +28,7 @@
 #define MCCONF_PWM_MODE					PWM_MODE_SYNCHRONOUS // Default PWM mode
 #endif
 #ifndef MCCONF_SENSOR_MODE
-#define MCCONF_SENSOR_MODE				SENSOR_MODE_SENSORLESS // Sensor mode
+#define MCCONF_SENSOR_MODE				SENSOR_MODE_SENSORED // Sensor mode
 #endif
 #ifndef MCCONF_COMM_MODE
 #define MCCONF_COMM_MODE				COMM_MODE_INTEGRATE	// The commutation mode to use
@@ -54,7 +54,7 @@
 #define MCCONF_L_IN_CURRENT_MAP_FILTER	0.005	// Input current filter for the mapped limit
 #endif
 #ifndef MCCONF_L_MAX_ABS_CURRENT
-#define MCCONF_L_MAX_ABS_CURRENT		130.0	// The maximum absolute current above which a fault is generated
+#define MCCONF_L_MAX_ABS_CURRENT		160.0	// The maximum absolute current above which a fault is generated
 #endif
 #ifndef MCCONF_L_MIN_VOLTAGE
 #define MCCONF_L_MIN_VOLTAGE			8.0		// Minimum input voltage
@@ -84,7 +84,7 @@
 #define MCCONF_L_RPM_START				0.8		// Fraction of full speed where RPM current limiting starts
 #endif
 #ifndef MCCONF_L_SLOW_ABS_OVERCURRENT
-#define MCCONF_L_SLOW_ABS_OVERCURRENT	false	// Use the filtered (and hence slower) current for the overcurrent fault detection
+#define MCCONF_L_SLOW_ABS_OVERCURRENT	true	// Use the filtered (and hence slower) current for the overcurrent fault detection
 #endif
 #ifndef MCCONF_L_MIN_DUTY
 #define MCCONF_L_MIN_DUTY				0.005	// Minimum duty cycle
@@ -275,7 +275,7 @@
 #define MCCONF_FOC_ENCODER_RATIO		7.0
 #endif
 #ifndef MCCONF_FOC_SENSOR_MODE
-#define MCCONF_FOC_SENSOR_MODE			FOC_SENSOR_MODE_SENSORLESS
+#define MCCONF_FOC_SENSOR_MODE			FOC_SENSOR_MODE_HALL
 #endif
 #ifndef MCCONF_FOC_PLL_KP
 #define MCCONF_FOC_PLL_KP				2000.0
@@ -503,7 +503,7 @@
 #define MCCONF_FOC_SPEED_SOURCE			FOC_SPEED_SRC_CORRECTED // Position source for speed trackers
 #endif
 #ifndef MCCONF_FOC_SHORT_LS_ON_ZERO_DUTY
-#define MCCONF_FOC_SHORT_LS_ON_ZERO_DUTY false // Short low-side phases on zero duty cycle
+#define MCCONF_FOC_SHORT_LS_ON_ZERO_DUTY true // Short low-side phases on zero duty cycle
 #endif
 #ifndef MCCONF_FOC_OVERMOD_FACTOR
 #define MCCONF_FOC_OVERMOD_FACTOR 		1.0 // Overmodulation factor
@@ -537,7 +537,7 @@
 #define MCCONF_M_CURRENT_BACKOFF_GAIN	0.5		// The error gain of the current limiting algorithm
 #endif
 #ifndef MCCONF_M_ENCODER_COUNTS
-#define MCCONF_M_ENCODER_COUNTS			8192	// The number of encoder counts
+#define MCCONF_M_ENCODER_COUNTS			42	// The number of encoder counts
 #endif
 #ifndef MCCONF_M_ENCODER_SIN_AMP
 #define MCCONF_M_ENCODER_SIN_AMP		1.0	// Sine amplitude
@@ -608,19 +608,19 @@
 #define MCCONF_SI_MOTOR_POLES			14 // Motor pole count
 #endif
 #ifndef MCCONF_SI_GEAR_RATIO
-#define MCCONF_SI_GEAR_RATIO			3 // Gear ratio
+#define MCCONF_SI_GEAR_RATIO			1 // Gear ratio
 #endif
 #ifndef MCCONF_SI_WHEEL_DIAMETER
-#define MCCONF_SI_WHEEL_DIAMETER		0.083 // Wheel Diameter
+#define MCCONF_SI_WHEEL_DIAMETER		1.000 // Wheel Diameter
 #endif
 #ifndef MCCONF_SI_BATTERY_TYPE
 #define MCCONF_SI_BATTERY_TYPE			BATTERY_TYPE_LIION_3_0__4_2 // Battery Type
 #endif
 #ifndef MCCONF_SI_BATTERY_CELLS
-#define MCCONF_SI_BATTERY_CELLS			3 // Battery Cells
+#define MCCONF_SI_BATTERY_CELLS			7 // Battery Cells
 #endif
 #ifndef MCCONF_SI_BATTERY_AH
-#define MCCONF_SI_BATTERY_AH			6.0 // Battery amp hours
+#define MCCONF_SI_BATTERY_AH			45.0 // Battery amp hours
 #endif
 #ifndef MCCONF_SI_MOTOR_NL_CURRENT
 #define MCCONF_SI_MOTOR_NL_CURRENT		1.0 // Motor no load current
@@ -628,7 +628,7 @@
 
 // BMS
 #ifndef MCCONF_BMS_TYPE
-#define MCCONF_BMS_TYPE					BMS_TYPE_VESC
+#define MCCONF_BMS_TYPE					BMS_TYPE_NONE
 #endif
 #ifndef MCCONF_BMS_LIMIT_MODE
 #define MCCONF_BMS_LIMIT_MODE			3

@@ -30,7 +30,7 @@
 
 // HW properties
 #define HW_HAS_DRV8301
-#define HW_HAS_3_SHUNTS
+// TODO: Broken opamp :( #define HW_HAS_3_SHUNTS
 
 // Macros
 #define ENABLE_GATE()			palSetPad(GPIOB, 5)
@@ -142,6 +142,7 @@
 #define GET_CURRENT1()        ADC_Value[ADC_IND_CURR1]
 #endif
 #endif
+
 #ifndef GET_CURRENT2
 #ifdef INVERTED_SHUNT_POLARITY
 #define GET_CURRENT2()      (4095 - ADC_Value[ADC_IND_CURR2])
@@ -149,6 +150,8 @@
 #define GET_CURRENT2()        ADC_Value[ADC_IND_CURR2]
 #endif
 #endif
+
+/*
 #ifndef GET_CURRENT3
 #ifdef INVERTED_SHUNT_POLARITY
 #define GET_CURRENT3()      (4095 - ADC_Value[ADC_IND_CURR3])
@@ -156,6 +159,7 @@
 #define GET_CURRENT3()      ADC_Value[ADC_IND_CURR3]
 #endif
 #endif
+*/
 
 // UART Peripheral
 #define HW_UART_DEV				SD3
